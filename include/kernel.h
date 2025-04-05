@@ -24,7 +24,7 @@ void memcpy(void *dest, void *src, unsigned int n);
 typedef int mutex_t;
 
 void mutex_lock(mutex_t *mutex);
-void mutex_unlock(mutex_t *mutex);
+#define mutex_unlock(mutex) (*mutex = 0)
 
 void panic(const char *msg);
 

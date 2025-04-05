@@ -34,8 +34,6 @@ static unsigned int schedule_timer;
 static unsigned int njiffies;
 static mutex_t sched_lock;
 
-bool g_sched_active = false;
-
 void sched_init()
 {
     struct proc *p;
@@ -69,7 +67,6 @@ void sched_init()
     out_byte_wait(PIT_DATA, TIMER_DIVIDER & 0xff);
     out_byte_wait(PIT_DATA, (TIMER_DIVIDER >> 8) & 0xff);
 
-    g_sched_active = true;
     ENABLE_INTERRUPTS;
 }
 
@@ -204,8 +201,10 @@ struct proc *create_proc()
     p->ktime = 0;
     p->utime = 0;
     p->next_tid = 1;
+    p->nthreads = 0;
     p->exit_status = 0;
     p->signal = 0;
+    p->mm_lock = 0;
 
     memcpy(p->pdir, init_pdir, PAGE_SIZE);
     p->pdir[1] = p->cr3 | PAGE_PRESENT | PAGE_WRITABLE;
@@ -233,13 +232,47 @@ struct thread *create_thread(struct proc *proc)
 
     t->counter = 0;
     t->sleep = 0;
+    t->signal = 0;
+    t->sigmask = 0;
     t->proc = proc;
     t->tid = proc ? proc->next_tid++ : 0;
+    if (proc)
+        inc_dword(&proc->nthreads);
 
     t->esp = (uint32_t)t->kstack + PAGE_SIZE;
     memset(t->kstack, 0, PAGE_SIZE);
 
     return t;
+}
+
+void sched_stop_other_threads()
+{
+    static mutex_t lock = 0;
+    struct thread *t;
+
+    mutex_lock(&lock);
+
+    /* In case another thread is terminating the process at the same time and
+     * already stopped us while we were waiting on the lock. */
+    if (thread->signal & 0x1) {
+        mutex_unlock(&lock);
+        dec_dword(&proc->nthreads);
+        thread->state = TS_NONE;
+        yield_thread();
+    }
+
+    for (t = threads; t < threads + NTHREADS; t++) {
+        if (t->proc && t->proc == proc && t != thread) {
+            t->signal |= 0x1;
+            if (t->state == TS_INTERRUPTIBLE)
+                t->state = TS_RUNNING;
+        }
+    }
+
+    mutex_unlock(&lock);
+
+    while (proc->nthreads > 1)
+        yield_thread();
 }
 
 void sched_terminate(int exit_status)
@@ -250,12 +283,7 @@ void sched_terminate(int exit_status)
     if (proc->pid == 1)
         panic("tried to kill init");
 
-    DISABLE_INTERRUPTS;
-    for (t = threads; t < threads + NTHREADS; t++) {
-        if (t->proc && t->proc->pid == proc->pid && t != thread)
-            t->state = TS_NONE;
-    }
-    ENABLE_INTERRUPTS;
+    sched_stop_other_threads();
 
     for (p = procs; p < procs + NPROCS; p++) {
         if (p->ppid == proc->pid && p->state != PS_NONE) {

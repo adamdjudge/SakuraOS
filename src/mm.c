@@ -225,11 +225,13 @@ static void free_proc_page(uint32_t addr)
         return;
 
     mutex_lock(&pc_lock);
-    if (pagecount[(vtophys(addr)-HIMEM_BASE) >> 12] == 0)
+    if (pagecount[(vtophys(addr)-HIMEM_BASE) >> 12] == 0) {
+        mutex_unlock(&pc_lock);
         free_page(addr);
-    else
+    } else {
         pagecount[(vtophys(addr)-HIMEM_BASE) >> 12]--;
-    mutex_unlock(&pc_lock);
+        mutex_unlock(&pc_lock);
+    }
 }
 
 void free_proc_memory()
@@ -257,16 +259,15 @@ void free_proc_memory()
 static void cowpage(uint32_t addr)
 {
     uint32_t paddr = vtophys(addr);
+    uint32_t flags = check_page(addr);
 
-    if (check_page(addr) & PAGE_WRITABLE) {
+    if (flags & PAGE_WRITABLE) {
         ptabs[TABENT(addr)] &= ~PAGE_WRITABLE;
         ptabs[TABENT(addr)] |= PAGE_COPYONWRITE;
-        pagecount[(paddr-HIMEM_BASE) >> 12] = 1;
-    } else if (check_page(addr) & PAGE_PRESENT) {
-        mutex_lock(&pc_lock);
-        pagecount[(paddr-HIMEM_BASE) >> 12]++;
-        mutex_unlock(&pc_lock);
     }
+
+    if (flags & PAGE_PRESENT)
+        inc_word(&pagecount[(paddr-HIMEM_BASE) >> 12]);
 }
 
 bool fork_memory(struct proc *newproc)
@@ -275,6 +276,8 @@ bool fork_memory(struct proc *newproc)
 
     if (proc->text_base == 0)
         return true;
+
+    mutex_lock(&proc->mm_lock);
 
     for (addr = proc->text_base; addr < proc->data_top; addr += PAGE_SIZE)
         cowpage(addr);
@@ -293,6 +296,7 @@ bool fork_memory(struct proc *newproc)
     }
 
     flush_tlb();
+    mutex_unlock(&proc->mm_lock);
     return true;
 
 nomem:
@@ -302,6 +306,8 @@ nomem:
             newproc->pdir[i] = 0;
         }
     }
+    flush_tlb();
+    mutex_unlock(&proc->mm_lock);
     panic("fork_memory: todo: un-cow pages on alloc failure");
     return false;
 }
@@ -322,6 +328,7 @@ void pagefault(struct exception *e)
            e->err & PF_WRITE ? "write" : "read", e->cr2);
     
     page = PAGE_BASE(e->cr2);
+    mutex_lock(&proc->mm_lock);
 
     if ((e->err & PF_PRESENT) == 0) {
         if (page >= proc->text_base && page < proc->data_base
@@ -339,8 +346,7 @@ void pagefault(struct exception *e)
                 panic("page fault read failed");
             
             set_page_writable(page, false);
-            flush_tlb();
-            return;
+            goto done;
         } else if (page >= proc->data_base && page < proc->data_top) {
             /* Lazily load data segment of executable. */
             if (!alloc_page(page, PAGE_USER | PAGE_WRITABLE))
@@ -355,25 +361,25 @@ void pagefault(struct exception *e)
             if (ret < size)
                 panic("page fault read failed");
 
-            flush_tlb();
-            return;
+            goto done;
         } else if (page < 0xfffff000 && page >= proc->stack_base - PAGE_SIZE) {
             /* Lazily allocate a new page of the stack. */
             if (!alloc_page(page, PAGE_USER | PAGE_WRITABLE))
                 panic("page fault alloc failed");
 
-            flush_tlb();
             proc->stack_base -= PAGE_SIZE;
-            return;
+            goto done;
         }
     } else if ((e->err & PF_WRITE) && (check_page(page) & PAGE_COPYONWRITE)) {
         /* Write to copy-on-write page. */
         mutex_lock(&pc_lock);
         if (pagecount[(vtophys(page)-HIMEM_BASE) >> 12] == 0) {
+            mutex_unlock(&pc_lock);
             ptabs[TABENT(page)] &= ~PAGE_COPYONWRITE;
             ptabs[TABENT(page)] |= PAGE_WRITABLE;
         } else {
             pagecount[(vtophys(page)-HIMEM_BASE) >> 12]--;
+            mutex_unlock(&pc_lock);
             if (!alloc_page(0xfffff000, PAGE_WRITABLE))
                 panic("out of memory");
             flush_tlb();
@@ -381,9 +387,7 @@ void pagefault(struct exception *e)
             ptabs[TABENT(page)] = vtophys(0xfffff000)
                                   | PAGE_PRESENT | PAGE_USER | PAGE_WRITABLE;
         }
-        mutex_unlock(&pc_lock);
-        flush_tlb();
-        return;
+        goto done;
     }
 
     if (e->err & PF_USER) {
@@ -393,4 +397,10 @@ void pagefault(struct exception *e)
         dump_exception(e);
         panic("unexpected kmode page fault");
     }
+
+    return;
+
+done:
+    flush_tlb();
+    mutex_unlock(&proc->mm_lock);
 }

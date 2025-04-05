@@ -9,7 +9,54 @@ extern thread
 extern next_thread
 extern proc
 extern tss_esp0
-extern g_sched_active
+
+; void inc_byte(uint8_t *val)
+; Atomically increment a byte in memory.
+global inc_byte
+inc_byte:
+    mov eax, [esp+4]
+    lock inc byte [eax]
+    ret
+
+; void inc_word(uint16_t *val)
+; Atomically increment a word in memory.
+global inc_word
+inc_word:
+    mov eax, [esp+4]
+    lock inc word [eax]
+    ret
+
+; void inc_dword(uint32_t *val)
+; Atomically increment a dword in memory.
+global inc_dword
+inc_dword:
+    mov eax, [esp+4]
+    lock inc dword [eax]
+    ret
+
+; void dec_byte(uint8_t *val)
+; Atomically decrement a byte in memory.
+global dec_byte
+dec_byte:
+    mov eax, [esp+4]
+    lock dec byte [eax]
+    ret
+
+; void dec_word(uint16_t *val)
+; Atomically decrement a word in memory.
+global dec_word
+dec_word:
+    mov eax, [esp+4]
+    lock dec word [eax]
+    ret
+
+; void dec_dword(uint32_t *val)
+; Atomically decrement a dword in memory.
+global dec_dword
+dec_dword:
+    mov eax, [esp+4]
+    lock dec dword [eax]
+    ret
 
 iowait:
     mov ecx, 0xffff
@@ -81,32 +128,23 @@ memcpy:
 
 ; void mutex_lock(mutex_t *mutex)
 ; Spinlock on a mutex. If the mutex is already locked, invoke the scheduler
-; on each loop to give other threads the chance to release it. If the scheduler
-; is inactive, do nothing and return.
+; on each loop to give other threads the chance to release it.
 global mutex_lock
 mutex_lock:
     mov eax, [esp+4]
-    cmp dword [g_sched_active], 0
-    jne .loop
-    ret
+    mov cx, 1
 .loop:
+    xchg cl, [eax]
+    jcxz .done
+    push eax
+    push ecx
     cli
-    cmp byte [eax], 0
-    je .done
     call schedule
     sti
+    pop ecx
+    pop eax
     jmp .loop
 .done:
-    mov byte [eax], 1
-    sti
-    ret
-
-; void mutex_unlock(mutex_t *mutex)
-; Release a mutex.
-global mutex_unlock
-mutex_unlock:
-    mov eax, [esp+4]
-    mov byte [eax], 0
     ret
 
 ; void enable_paging()

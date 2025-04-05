@@ -51,6 +51,7 @@ struct proc {
     /* Process memory management */
     uint32_t *pdir;        /* Page directory */
     uint32_t cr3;          /* Page directory physical address */
+    mutex_t mm_lock;       /* Lock for memory management */
 
     unsigned int state;    /* Process state */
     unsigned int pid;      /* Process ID */
@@ -66,6 +67,7 @@ struct proc {
     unsigned int ktime;    /* Kernel time elapsed in millis */
     unsigned int utime;    /* User time elapsed in millis */
     unsigned int next_tid; /* Next thread ID */
+    unsigned int nthreads; /* Number of threads */
     unsigned int signal;   /* Signal bit field */
     int exit_status;       /* Exit status for waitpid */
 
@@ -125,6 +127,7 @@ void sleep_thread(unsigned int time);
 unsigned int jiffies();
 struct proc *create_proc();
 struct thread *create_thread(struct proc *proc);
+void sched_stop_other_threads();
 void sched_terminate(int exit_status);
 int sched_waitpid(int pid, int *wstatus, int options);
 void sched_interrupt_proc(struct proc *proc);

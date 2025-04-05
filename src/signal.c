@@ -34,6 +34,15 @@ void handle_signal(struct exception *e)
     int signum = 0;
     struct sigframe *frame;
 
+    /* There is no standard zeroth signal, so bit 0 of the thread bitfield is
+     * used to immediately terminate the thread. */
+    if (thread->signal & 0x1) {
+        if (thread->proc)
+            dec_dword(&proc->nthreads);
+        thread->state = TS_NONE;
+        yield_thread();
+    }
+
     while ((signal_pending() & (1 << signum)) == 0)
         signum++;
 
@@ -86,6 +95,7 @@ void handle_signal(struct exception *e)
         case SIGTTOU:
             printk("pid %d stopped by signal %d\n", proc->pid, signum);
             block_thread_interruptible();
+            return;
         }
     }
 

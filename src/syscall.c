@@ -109,8 +109,7 @@ int sys_execve(struct exception *e)
     printk("execve: %s [flags 0x%x, text %d, data %d]\n",
            filename, hdr.flags, hdr.text_size, hdr.data_size);
     
-    /* TODO: kill all other threads belonging to this process -- this will
-     *       require waiting here for them all to stop before continuing */
+    sched_stop_other_threads();
     
     free_proc_memory();
     proc->exe = exe;

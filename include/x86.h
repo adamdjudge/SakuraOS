@@ -26,6 +26,13 @@ extern char g_cpuid_vendor[];
 extern char g_cpuid_brand[];
 extern uint16_t g_cpuid_base_freq;
 
+extern void inc_byte(uint8_t *val);
+extern void inc_word(uint16_t *val);
+extern void inc_dword(uint32_t *val);
+extern void dec_byte(uint8_t *val);
+extern void dec_word(uint16_t *val);
+extern void dec_dword(uint32_t *val);
+
 extern void out_byte(uint16_t port, uint8_t data);
 extern void out_byte_wait(uint16_t port, uint8_t data);
 extern uint8_t in_byte(uint16_t port);
