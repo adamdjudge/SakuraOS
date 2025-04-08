@@ -45,6 +45,11 @@ enum {
 };
 
 /**
+ * Non-standard thread kill signal.
+ */
+#define SIG_KILL_THREAD 0x1
+
+/**
  * Signal dispositions (if not a function pointer).
  */
 #define SIG_DFL 0

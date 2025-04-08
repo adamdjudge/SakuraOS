@@ -127,6 +127,7 @@ void sleep_thread(unsigned int time);
 unsigned int jiffies();
 struct proc *create_proc();
 struct thread *create_thread(struct proc *proc);
+void sched_stop_thread();
 void sched_stop_other_threads();
 void sched_terminate(int exit_status);
 int sched_waitpid(int pid, int *wstatus, int options);

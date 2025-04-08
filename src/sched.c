@@ -245,6 +245,14 @@ struct thread *create_thread(struct proc *proc)
     return t;
 }
 
+void sched_stop_thread()
+{
+    if (thread->proc)
+        dec_dword(&proc->nthreads);
+    thread->state = TS_NONE;
+    yield_thread();
+}
+
 void sched_stop_other_threads()
 {
     static mutex_t lock = 0;
@@ -254,11 +262,9 @@ void sched_stop_other_threads()
 
     /* In case another thread is terminating the process at the same time and
      * already stopped us while we were waiting on the lock. */
-    if (thread->signal & 0x1) {
+    if (thread->signal & SIG_KILL_THREAD) {
         mutex_unlock(&lock);
-        dec_dword(&proc->nthreads);
-        thread->state = TS_NONE;
-        yield_thread();
+        sched_stop_thread();
     }
 
     for (t = threads; t < threads + NTHREADS; t++) {
