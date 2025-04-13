@@ -47,7 +47,6 @@ void create_init()
     init_proc->gid = 0;
     init_proc->euid = 0;
     init_proc->egid = 0;
-    init_proc->text_base = 0;
 
     init_thread = create_thread(init_proc);
     if (!init_thread)

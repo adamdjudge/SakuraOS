@@ -7,8 +7,8 @@
 #include <kernel.h>
 #include <fs.h>
 #include <exception.h>
-#include <sched.h>
 #include <mm.h>
+#include <sched.h>
 #include <x86.h>
 #include <signal.h>
 
@@ -110,14 +110,33 @@ int sys_execve(struct exception *e)
            filename, hdr.flags, hdr.text_size, hdr.data_size);
     
     sched_stop_other_threads();
-    
-    free_proc_memory();
+    mm_free_proc_memory();
+
     proc->exe = exe;
-    proc->hdr = hdr;
-    proc->text_base = 0x80000000;
-    proc->data_base = proc->text_base + PAGE_ALIGN(hdr.text_size);
-    proc->data_top = proc->data_base + PAGE_ALIGN(hdr.data_size);
-    proc->stack_base = 0xffffe000;
+    mm_add_mapping(
+        0x80000000,
+        hdr.text_size,
+        VMAP_READONLY,
+        sizeof(hdr),
+        hdr.text_size,
+        exe
+    );
+    mm_add_mapping(
+        0x80000000 + PAGE_ALIGN(hdr.text_size),
+        hdr.data_size,
+        VMAP_WRITABLE,
+        sizeof(hdr) + hdr.text_size,
+        exe->size - sizeof(hdr) - hdr.text_size,
+        exe
+    );
+    mm_add_mapping(
+        0xffffe000,
+        PAGE_SIZE,
+        VMAP_WRITABLE | VMAP_STACK,
+        0,
+        0,
+        NULL
+    );
 
     proc->rtime = 0;
     proc->ktime = 0;
@@ -142,9 +161,9 @@ int sys_execve(struct exception *e)
     e->edi = 0;
     e->esi = 0;
     e->ebp = 0;
-    e->esp = proc->stack_base + PAGE_SIZE;
+    e->esp = 0xfffff000;
     e->eflags = (1 << 9);
-    e->eip = proc->text_base;
+    e->eip = 0x80000000;
     return 0;
 }
 
@@ -176,12 +195,13 @@ int sys_fork(struct exception *e)
         return -EAGAIN;
     }
 
-    if (!fork_memory(new_proc)) {
+    if (!mm_fork_memory(new_proc->pdir)) {
         printk("WARNING: fork: out of memory\n");
         new_proc->state = PS_NONE;
         new_thread->state = TS_NONE;
         return -ENOMEM;
     }
+    memcpy(new_proc->vmaps, proc->vmaps, sizeof(proc->vmaps));
 
     new_proc->ppid = proc->pid;
     new_proc->pgid = proc->pgid;
@@ -191,13 +211,7 @@ int sys_fork(struct exception *e)
     new_proc->euid = proc->euid;
     new_proc->egid = proc->egid;
     new_proc->cwd = proc->cwd;
-
-    new_proc->text_base = proc->text_base;
-    new_proc->data_base = proc->data_base;
-    new_proc->data_top = proc->data_top;
-    new_proc->stack_base = proc->stack_base;
     new_proc->exe = proc->exe;
-    new_proc->hdr = proc->hdr;
 
     idup(proc->cwd);
     idup(proc->exe);

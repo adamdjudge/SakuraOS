@@ -7,8 +7,8 @@
 #include <x86.h>
 #include <exception.h>
 #include <fs.h>
-#include <sched.h>
 #include <mm.h>
+#include <sched.h>
 #include <signal.h>
 
 /* Programmable Interrupt Timer Registers */
@@ -286,6 +286,8 @@ void sched_terminate(int exit_status)
     struct thread *t;
     struct proc *p, *pp;
 
+    printk("pid %d exiting with status 0x%x\n", proc->pid, exit_status);
+
     if (proc->pid == 1)
         panic("tried to kill init");
 
@@ -303,7 +305,7 @@ void sched_terminate(int exit_status)
     if (pp)
         send_proc_signal(pp, SIGCHLD);
 
-    free_proc_memory();
+    mm_free_proc_memory();
 
     iput(proc->exe);
     iput(proc->cwd);

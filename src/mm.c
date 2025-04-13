@@ -4,11 +4,11 @@
  */
 
 #include <kernel.h>
+#include <mm.h>
 #include <x86.h>
 #include <exception.h>
 #include <fs.h>
 #include <sched.h>
-#include <mm.h>
 #include <signal.h>
 
 /* Defined in linker script */
@@ -67,7 +67,7 @@ static void push_page(uint32_t addr)
 
 void mm_init()
 {
-    uint32_t signature, addr, himem, i, ps_top;
+    uint32_t addr, himem, i, ps_top;
     struct memrange *mr;
 
     printk("Initializing virtual memory manager\n");
@@ -191,7 +191,7 @@ void bump_kvaddr()
 void free_page(uint32_t vaddr)
 {
     uint32_t paddr = ptabs[TABENT(vaddr)] & ~PAGE_MASK;
-    ptabs[TABENT(vaddr)] &= ~PAGE_PRESENT;
+    ptabs[TABENT(vaddr)] = 0;
     push_page(paddr);
 }
 
@@ -219,32 +219,52 @@ void set_page_writable(uint32_t vaddr, bool writable)
         ptabs[TABENT(vaddr)] &= ~PAGE_WRITABLE;
 }
 
-static void free_proc_page(uint32_t addr)
+bool mm_add_mapping(uint32_t base, uint32_t size, uint32_t flags,
+                    uint32_t file_offset, uint32_t file_size,
+                    struct inode *inode)
 {
-    if (!check_page(addr))
-        return;
+    struct vmap *vm;
 
-    mutex_lock(&pc_lock);
-    if (pagecount[(vtophys(addr)-HIMEM_BASE) >> 12] == 0) {
-        mutex_unlock(&pc_lock);
-        free_page(addr);
-    } else {
-        pagecount[(vtophys(addr)-HIMEM_BASE) >> 12]--;
-        mutex_unlock(&pc_lock);
+    mutex_lock(&proc->mm_lock);
+
+    for (vm = proc->vmaps; vm < proc->vmaps + NVMAPS; vm++) {
+        if (vm->size == 0) {
+            vm->base = base;
+            vm->size = size;
+            vm->flags = flags;
+            vm->file_offset = file_offset;
+            vm->file_size = file_size;
+            vm->inode = inode;
+            break;
+        }
     }
+
+    mutex_unlock(&proc->mm_lock);
+    return vm != proc->vmaps + NVMAPS;
 }
 
-void free_proc_memory()
+void mm_free_proc_memory()
 {
+    struct vmap *vm;
     uint32_t addr, i;
 
-    if (proc->text_base == 0)
-        return;
+    for (vm = proc->vmaps; vm < proc->vmaps + NVMAPS; vm++) {
+        for (addr = vm->base; addr < vm->base + vm->size; addr += PAGE_SIZE) {
+            if (!check_page(addr))
+                continue;
 
-    for (addr = proc->text_base; addr < proc->data_top; addr += PAGE_SIZE)
-        free_proc_page(addr);
-    for (addr = proc->stack_base; addr < 0xfffff000; addr += PAGE_SIZE)
-        free_proc_page(addr);
+            mutex_lock(&pc_lock);
+            if (PAGECOUNT(addr) == 0) {
+                mutex_unlock(&pc_lock);
+                free_page(addr);
+            } else {
+                PAGECOUNT(addr)--;
+                mutex_unlock(&pc_lock);
+            }
+        }
+
+        vm->size = 0;
+    }
 
     for (i = 512; i < 1024; i++) {
         if (pdir[i] & PAGE_PRESENT) {
@@ -256,67 +276,123 @@ void free_proc_memory()
     flush_tlb();
 }
 
-static void cowpage(uint32_t addr)
+bool mm_fork_memory(uint32_t *new_pdir)
 {
-    uint32_t paddr = vtophys(addr);
-    uint32_t flags = check_page(addr);
-
-    if (flags & PAGE_WRITABLE) {
-        ptabs[TABENT(addr)] &= ~PAGE_WRITABLE;
-        ptabs[TABENT(addr)] |= PAGE_COPYONWRITE;
-    }
-
-    if (flags & PAGE_PRESENT)
-        inc_word(&pagecount[(paddr-HIMEM_BASE) >> 12]);
-}
-
-bool fork_memory(struct proc *newproc)
-{
-    uint32_t addr, i;
-
-    if (proc->text_base == 0)
-        return true;
+    struct vmap *vm;
+    uint32_t addr, i, flags;
 
     mutex_lock(&proc->mm_lock);
 
-    for (addr = proc->text_base; addr < proc->data_top; addr += PAGE_SIZE)
-        cowpage(addr);
-    for (addr = proc->stack_base; addr < 0xfffff000; addr += PAGE_SIZE)
-        cowpage(addr);
+    /* Set each private writable page to copy-on-write and increment the
+     * physical page reference count of all present pages. */
+    for (vm = proc->vmaps; vm < proc->vmaps + NVMAPS; vm++) {
+        for (addr = vm->base; addr < vm->base + vm->size; addr += PAGE_SIZE) {
+            flags = check_page(addr);
+            if (!(vm->flags & VMAP_SHARED) && (flags & PAGE_WRITABLE)) {
+                ptabs[TABENT(addr)] &= ~PAGE_WRITABLE;
+                ptabs[TABENT(addr)] |= PAGE_COPYONWRITE;
+            }
+            if (flags & PAGE_PRESENT)
+                inc_word(&PAGECOUNT(addr));
+        }
+    }
 
+    /* Copy all user page tables into the new process. Each physical page used
+     * must be temporarily mapped into our own address space at the top page so
+     * it can be written to, then it's added to the new page directory. */
     for (i = 512; i < 1024; i++) {
         if (pdir[i] & PAGE_PRESENT) {
-            if (!alloc_page(0xfffff000, PAGE_WRITABLE))
-                goto nomem;
+            if (!alloc_page(0xfffff000, PAGE_WRITABLE)) {
+                mutex_unlock(&proc->mm_lock);
+                panic("mm_fork_memory: out of memory"); // FIXME: un-cow pages
+                return false;
+            }
             flush_tlb();
-            memcpy((void *)0xfffff000, &ptabs[i*1024], PAGE_SIZE);
-            newproc->pdir[i] = vtophys(0xfffff000)
-                               | PAGE_PRESENT | PAGE_USER | PAGE_WRITABLE;
+            memcpy((void *)0xfffff000, ptabs + i*1024, PAGE_SIZE);
+            new_pdir[i] = vtophys(0xfffff000)
+                          | PAGE_PRESENT | PAGE_USER | PAGE_WRITABLE;
         }
     }
 
     flush_tlb();
     mutex_unlock(&proc->mm_lock);
     return true;
-
-nomem:
-    for (i = 512; i < 1024; i++) {
-        if (newproc->pdir[i] & PAGE_PRESENT) {
-            push_page(newproc->pdir[i] & ~PAGE_MASK);
-            newproc->pdir[i] = 0;
-        }
-    }
-    flush_tlb();
-    mutex_unlock(&proc->mm_lock);
-    panic("fork_memory: todo: un-cow pages on alloc failure");
-    return false;
 }
 
-void pagefault(struct exception *e)
+static void pf_error(struct exception *e)
 {
-    unsigned int offset, size;
-    uint32_t page;
+    if (e->err & PF_USER) {
+        printk("warning: pid %d segmentation fault [%s 0x%x at 0x%x]\n",
+               proc->pid, e->err & PF_WRITE ? "write" : "read", e->cr2, e->eip);
+        thread->signal |= (1 << SIGSEGV);
+    } else {
+        dump_exception(e);
+        panic("unexpected kmode page fault");
+    }
+}
+
+static void pf_copy_on_write(uint32_t page)
+{
+    mutex_lock(&pc_lock);
+
+    if (PAGECOUNT(page) == 0) {
+        mutex_unlock(&pc_lock);
+        ptabs[TABENT(page)] &= ~PAGE_COPYONWRITE;
+        ptabs[TABENT(page)] |= PAGE_WRITABLE;
+    } else {
+        PAGECOUNT(page)--;
+        mutex_unlock(&pc_lock);
+
+        /* Allocate new page temporarily mapped to the top of VM, copy contents
+         * to it, then remap over the original page as writable. */
+        if (!alloc_page(0xfffff000, PAGE_WRITABLE))
+            panic("pf_copy_on_write: out of memory"); // FIXME
+        flush_tlb();
+        memcpy((void *)0xfffff000, (void *)page, PAGE_SIZE);
+        ptabs[TABENT(page)] = vtophys(0xfffff000)
+                              | PAGE_PRESENT | PAGE_USER | PAGE_WRITABLE;
+    }
+
+    flush_tlb();
+}
+
+static void pf_load_page(uint32_t page, struct vmap *vm)
+{
+    unsigned int offset, readlen, zerolen;
     int ret;
+
+    offset = page - vm->base;
+    if (offset < vm->file_size)
+        readlen = MIN(PAGE_SIZE, vm->file_size - offset);
+    else
+        readlen = 0;
+    zerolen = PAGE_SIZE - readlen;
+
+    if (!alloc_page(page, PAGE_USER | PAGE_WRITABLE))
+        panic("pf_load_page: out of memory"); // FIXME
+    if (readlen > 0) {
+        ret = iread(vm->inode, (void *)page, vm->file_offset + offset, readlen);
+        if (ret < readlen)
+            panic("pf_load_page: read failed"); // FIXME: segfault?
+    }
+    if (zerolen > 0)
+        memset((void *)(page + readlen), 0, zerolen);
+
+    if ((vm->flags & VMAP_WRITABLE) == 0) {
+        set_page_writable(page, false);
+        flush_tlb();
+    }
+    if (vm->flags & VMAP_STACK) {
+        // TODO: check for collision with other mapping first
+        vm->base -= PAGE_SIZE;
+        vm->size += PAGE_SIZE;
+    }
+}
+
+void handle_page_fault(struct exception *e)
+{
+    uint32_t page;
+    struct vmap *vm;
 
     if (!proc) {
         dump_exception(e);
@@ -326,81 +402,27 @@ void pagefault(struct exception *e)
 
     printk("page fault: pid %d: %s 0x%x\n", proc->pid,
            e->err & PF_WRITE ? "write" : "read", e->cr2);
-    
-    page = PAGE_BASE(e->cr2);
+
     mutex_lock(&proc->mm_lock);
-
-    if ((e->err & PF_PRESENT) == 0) {
-        if (page >= proc->text_base && page < proc->data_base
-            && (e->err & PF_WRITE) == 0)
-        {
-            /* Lazily load text segment of executable. */
-            if (!alloc_page(page, PAGE_USER | PAGE_WRITABLE))
-                panic("page fault alloc failed");
-
-            offset = page - proc->text_base;
-            size = MIN(PAGE_SIZE, proc->hdr.text_size - offset);
-            ret = iread(proc->exe, (void *)page,
-                        offset + sizeof(struct exe_header), size);
-            if (ret < size)
-                panic("page fault read failed");
-            
-            set_page_writable(page, false);
-            goto done;
-        } else if (page >= proc->data_base && page < proc->data_top) {
-            /* Lazily load data segment of executable. */
-            if (!alloc_page(page, PAGE_USER | PAGE_WRITABLE))
-                panic("page fault alloc failed");
-
-            offset = page - proc->data_base;
-            size = MIN(PAGE_SIZE, proc->hdr.data_size - offset);
-            ret = iread(proc->exe, (void *)page,
-                        offset + sizeof(struct exe_header)
-                               + proc->hdr.text_size,
-                        size);
-            if (ret < size)
-                panic("page fault read failed");
-
-            goto done;
-        } else if (page < 0xfffff000 && page >= proc->stack_base - PAGE_SIZE) {
-            /* Lazily allocate a new page of the stack. */
-            if (!alloc_page(page, PAGE_USER | PAGE_WRITABLE))
-                panic("page fault alloc failed");
-
-            proc->stack_base -= PAGE_SIZE;
-            goto done;
-        }
-    } else if ((e->err & PF_WRITE) && (check_page(page) & PAGE_COPYONWRITE)) {
-        /* Write to copy-on-write page. */
-        mutex_lock(&pc_lock);
-        if (pagecount[(vtophys(page)-HIMEM_BASE) >> 12] == 0) {
-            mutex_unlock(&pc_lock);
-            ptabs[TABENT(page)] &= ~PAGE_COPYONWRITE;
-            ptabs[TABENT(page)] |= PAGE_WRITABLE;
-        } else {
-            pagecount[(vtophys(page)-HIMEM_BASE) >> 12]--;
-            mutex_unlock(&pc_lock);
-            if (!alloc_page(0xfffff000, PAGE_WRITABLE))
-                panic("out of memory");
-            flush_tlb();
-            memcpy((void *)0xfffff000, (void *)page, PAGE_SIZE);
-            ptabs[TABENT(page)] = vtophys(0xfffff000)
-                                  | PAGE_PRESENT | PAGE_USER | PAGE_WRITABLE;
-        }
-        goto done;
+    page = PAGE_BASE(e->cr2);
+    for (vm = proc->vmaps; vm < proc->vmaps + NVMAPS; vm++) {
+        if (page >= vm->base && page < vm->base + vm->size)
+            break;
+    }
+    if (vm == proc->vmaps + NVMAPS) {
+        pf_error(e);
+        mutex_unlock(&proc->mm_lock);
+        return;
     }
 
-    if (e->err & PF_USER) {
-        dump_exception(e);
-        thread->signal |= (1 << SIGSEGV);
-    } else {
-        dump_exception(e);
-        panic("unexpected kmode page fault");
-    }
+    if ((e->err & PF_WRITE) && !(vm->flags & VMAP_WRITABLE))
+        pf_error(e);
+    else if ((e->err & PF_WRITE) && (check_page(page) & PAGE_COPYONWRITE))
+        pf_copy_on_write(page);
+    else if ((e->err & PF_PRESENT) == 0)
+        pf_load_page(page, vm);
+    else
+        pf_error(e);
 
-    return;
-
-done:
-    flush_tlb();
     mutex_unlock(&proc->mm_lock);
 }

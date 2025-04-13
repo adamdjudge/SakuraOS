@@ -16,7 +16,7 @@ extern void handle_timer_irq();
 extern void handle_floppy_irq();
 extern void floppy_update_timer();
 
-extern void pagefault(struct exception *e);
+extern void handle_page_fault(struct exception *e);
 extern void syscall(struct exception *e);
 extern void handle_signal(struct exception *e);
 
@@ -82,7 +82,7 @@ void handle_exception(struct exception e)
         }
         break;
     case ENO_PAGE_FAULT:
-        pagefault(&e);
+        handle_page_fault(&e);
         break;
     case ENO_SYSCALL:
         syscall(&e);
