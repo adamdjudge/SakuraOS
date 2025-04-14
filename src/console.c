@@ -24,7 +24,7 @@ static void update_cursor()
 
 void console_init()
 {
-    int i, j;
+    int i;
 
     color = BG_BLACK | TEXT_WHITE;
     pos = 0;

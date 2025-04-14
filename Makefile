@@ -1,4 +1,4 @@
-CC = gcc -c -m32 -ffreestanding -fno-leading-underscore -fno-pie -Iinclude -std=c99
+CC = gcc -c -m32 -ffreestanding -fno-leading-underscore -fno-pie -Iinclude -std=c99 -Werror -Wall
 AS = nasm -f elf32
 
 OBJ = \

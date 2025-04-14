@@ -283,7 +283,6 @@ void sched_stop_other_threads()
 
 void sched_terminate(int exit_status)
 {
-    struct thread *t;
     struct proc *p, *pp;
 
     printk("pid %d exiting with status 0x%x\n", proc->pid, exit_status);

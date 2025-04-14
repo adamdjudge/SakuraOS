@@ -53,7 +53,7 @@ static void fifo_write(uint8_t data)
 {
     uint8_t msr = 0;
 
-    while (msr & MSR_RQM == 0)
+    while ((msr & MSR_RQM) == 0)
         msr = in_byte(FDC_MSR);
     out_byte_wait(FDC_FIFO, data);
 }
@@ -63,7 +63,7 @@ static uint8_t fifo_read()
 {
     uint8_t msr = 0;
 
-    while (msr & MSR_RQM == 0)
+    while ((msr & MSR_RQM) == 0)
         msr = in_byte(FDC_MSR);
     return in_byte_wait(FDC_FIFO);
 }

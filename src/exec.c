@@ -86,7 +86,6 @@ int sys_execve(struct exception *e)
     int ret, i;
     struct inode *exe;
     struct elf32_ehdr ehdr;
-    uint32_t vaddr;
     char *filename = (char *)e->ebx;
 
     ret = ilookup(&exe, filename);

@@ -114,7 +114,7 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
             return -1; /* TODO: char devices, etc. */
         }
 
-        b = readblk(i->dev, devblk);
+        b = readblk(dev, devblk);
         if (!b)
             return total;
         copylen = MIN(BLOCKSIZE - blk_off, MIN(length - total, BLOCKSIZE));
