@@ -22,7 +22,8 @@ OBJ = \
 	src/blkdev.o \
 	src/super.o \
 	src/inode.o \
-	src/file.o
+	src/file.o \
+	src/exec.o
 
 all: kernel
 

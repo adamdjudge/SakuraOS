@@ -235,6 +235,12 @@ bool mm_add_mapping(uint32_t base, uint32_t size, uint32_t flags,
             vm->file_offset = file_offset;
             vm->file_size = file_size;
             vm->inode = inode;
+
+            printk("mm: pid %d: vmap 0x%x-0x%x %s %s%s\n", proc->pid, base,
+                   base + size - 1,
+                   (flags & VMAP_WRITABLE) ? "writable" : "readonly",
+                   (flags & VMAP_STACK) ? "stack " : "",
+                   (flags & VMAP_SHARED) ? "shared " : "");
             break;
         }
     }
@@ -266,7 +272,7 @@ void mm_free_proc_memory()
         vm->size = 0;
     }
 
-    for (i = 512; i < 1024; i++) {
+    for (i = 256; i < 1024; i++) {
         if (pdir[i] & PAGE_PRESENT) {
             push_page(pdir[i] & ~PAGE_MASK);
             pdir[i] = 0;
@@ -300,7 +306,7 @@ bool mm_fork_memory(uint32_t *new_pdir)
     /* Copy all user page tables into the new process. Each physical page used
      * must be temporarily mapped into our own address space at the top page so
      * it can be written to, then it's added to the new page directory. */
-    for (i = 512; i < 1024; i++) {
+    for (i = 256; i < 1024; i++) {
         if (pdir[i] & PAGE_PRESENT) {
             if (!alloc_page(0xfffff000, PAGE_WRITABLE)) {
                 mutex_unlock(&proc->mm_lock);

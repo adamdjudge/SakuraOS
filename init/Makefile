@@ -12,8 +12,7 @@ all: init
 	$(AS) -o $@ $<
 
 init: link.ld $(OBJ)
-	ld -T $< -o init.elf $(OBJ)
-	objcopy -O binary init.elf init
+	ld -T $< -o init $(OBJ)
 
 clean:
-	rm -f init init.elf $(OBJ)
+	rm -f init $(OBJ)

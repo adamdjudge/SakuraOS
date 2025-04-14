@@ -4,16 +4,10 @@ ENTRY(start)
 
 SECTIONS
 {
-    . = 0x7ffffff0;
+    . = 0x40000000;
 
     .text :
     {
-        LONG(0xcafebabe);
-        LONG(0);
-        LONG(_text_end - _text);
-        LONG(_data_end - _data);
-
-        _text = .;
         *(.text)
     }
 
@@ -22,11 +16,9 @@ SECTIONS
         *(.rodata)
     }
 
-    _text_end = .;
-
     .data ALIGN(4K) :
     {
-        _data = .;
+        . = ALIGN(4K);
         *(.data)
     }
 
@@ -34,8 +26,6 @@ SECTIONS
     {
         *(.bss)
     }
-
-    _data_end = .;
 
     /DISCARD/ :
     {
