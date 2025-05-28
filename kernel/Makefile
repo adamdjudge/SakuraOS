@@ -25,18 +25,16 @@ OBJ = \
 	file.o \
 	exec.o
 
-all: kernel
+kernel: link.ld $(OBJ)
+	ld -T $< -o kernel.elf $(OBJ)
+	objcopy -O binary kernel.elf kernel
+	objdump -M intel -D kernel.elf > disasm.txt
 
 %.o: %.c
 	$(CC) -o $@ $<
 
 %.o: %.s
 	$(AS) -o $@ $<
-
-kernel: link.ld $(OBJ)
-	ld -T $< -o kernel.elf $(OBJ)
-	objcopy -O binary kernel.elf kernel
-	objdump -M intel -D kernel.elf > disasm.txt
 
 clean:
 	rm -f kernel kernel.elf disasm.txt $(OBJ)

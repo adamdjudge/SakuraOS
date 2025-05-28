@@ -4,9 +4,11 @@
 # Copyright 2025 Adam Judge
 
 cd kernel
-make kernel || exit 1
+make || exit 1
+cd ../lib
+make || exit 1
 cd ../init
-make init || exit 1
+make || exit 1
 cd ../boot
 nasm -o bootsect.bin -f bin boot.s || exit 1
 cd ..

@@ -1,18 +1,17 @@
-CC = gcc -c -m32 -ffreestanding -fno-pie -std=c99 -Wall -Werror
+CC = gcc -c -m32 -ffreestanding -fno-pie -std=c99 -Wall -Werror -I../lib/include
 AS = nasm -f elf32
 
-OBJ = lib.o init.o
+OBJ = init.o
+LIB = ../lib/libsakura.a
 
-all: init
+init: link.ld $(OBJ) $(LIB)
+	ld -T $< -o init $(OBJ) $(LIB)
 
 %.o: %.c
 	$(CC) -o $@ $<
 
 %.o: %.s
 	$(AS) -o $@ $<
-
-init: link.ld $(OBJ)
-	ld -T $< -o init $(OBJ)
 
 clean:
 	rm -f init $(OBJ)
