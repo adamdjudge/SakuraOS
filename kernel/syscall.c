@@ -96,7 +96,6 @@ int sys_fork(struct exception *e)
         return -EAGAIN;
     }
 
-    /* TODO: we need to copy all of the calling process's threads... */
     new_thread = create_thread(new_proc);
     if (!new_thread) {
         printk("WARNING: fork: thread table full\n");
@@ -119,12 +118,11 @@ int sys_fork(struct exception *e)
     new_proc->gid = proc->gid;
     new_proc->euid = proc->euid;
     new_proc->egid = proc->egid;
-    new_proc->cwd = proc->cwd;
-    new_proc->exe = proc->exe;
+    new_proc->cwd = idup(proc->cwd);
+    new_proc->exe = idup(proc->exe);
+    memcpy(new_proc->sigdisp, proc->sigdisp, sizeof(proc->sigdisp));
 
-    idup(proc->cwd);
-    idup(proc->exe);
-
+    new_thread->sigmask = thread->sigmask;
     new_thread->esp -= sizeof(struct init_kstack);
     kstack = (struct init_kstack *)new_thread->esp;
     kstack->ret_addr = (uint32_t)iret_from_exception;

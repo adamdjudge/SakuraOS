@@ -9,6 +9,7 @@
 #include <blkdev.h>
 #include <buffer.h>
 #include <sched.h>
+#include <x86.h>
 
 /* Root directory of filesystem tree */
 struct inode *g_root_dir;
@@ -28,9 +29,7 @@ int iget(struct inode **ip, struct superblock *s, unsigned int inum)
     mutex_lock(&inodes_lock);
     for (i = inodes; i < inodes + NUM_INODES; i++) {
         if (i->dev == s->dev && i->inum == inum) {
-            mutex_lock(&i->lock);
-            i->count++;
-            mutex_unlock(&i->lock);
+            idup(i);
             mutex_unlock(&inodes_lock);
             *ip = i;
             return 0;
@@ -70,18 +69,15 @@ int iget(struct inode **ip, struct superblock *s, unsigned int inum)
     return 0;
 }
 
-void idup(struct inode *i)
+struct inode *idup(struct inode *i)
 {
-    mutex_lock(&i->lock);
-    i->count++;
-    mutex_unlock(&i->lock);
+    inc_dword(&i->count);
+    return i;
 }
 
 void iput(struct inode *i)
 {
-    mutex_lock(&i->lock);
-    i->count--;
-    mutex_unlock(&i->lock);
+    dec_dword(&i->count);
     /* TODO: write if dirty */
 }
 

@@ -111,7 +111,7 @@ enum {
 
 int mount(dev_t dev, struct inode **ip);
 int iget(struct inode **ip, struct superblock *s, unsigned int inum);
-void idup(struct inode *i);
+struct inode *idup(struct inode *i);
 void iput(struct inode *i);
 int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length);
 int ilookup(struct inode **ip, char *path);
