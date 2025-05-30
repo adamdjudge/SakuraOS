@@ -56,6 +56,11 @@ enum {
 #define SIG_IGN 1
 
 /**
+ * Exit status flag indicating signaled termination.
+ */
+#define TERM_SIGNALED 0x100
+
+/**
  * Signal handler stack frame.
  */
 struct sigframe {

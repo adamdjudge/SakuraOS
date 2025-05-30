@@ -46,7 +46,7 @@ void handle_signal(struct exception *e)
     ENABLE_INTERRUPTS;
 
     if (signum == SIGKILL) {
-        sched_terminate(SIGKILL << 8);
+        sched_terminate(SIGKILL | TERM_SIGNALED);
     } else if (signum == SIGSTOP) {
         printk("pid %d stopped by SIGSTOP\n", proc->pid);
         block_thread_interruptible(); // huh?
@@ -80,7 +80,7 @@ void handle_signal(struct exception *e)
         case SIGUSR1:
         case SIGUSR2:
         case SIGVTALRM:
-            sched_terminate(signum << 8);
+            sched_terminate(signum | TERM_SIGNALED);
 
         case SIGTSTP:
         case SIGTTIN:

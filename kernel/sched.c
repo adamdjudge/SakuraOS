@@ -320,10 +320,10 @@ int sched_waitpid(int pid, int *wstatus, int options)
     struct proc *p;
     bool found = false;
 
-    for (;;) {
-        if (signal_pending())
-            return -EINTR;
+    if (options & ~0x3)
+        return -EINVAL;
 
+    for (;;) {
         mutex_lock(&sched_lock);
         for (p = procs; p < procs + NPROCS; p++) {
             if (p->state == PS_NONE || p->ppid != proc->pid)
@@ -347,11 +347,16 @@ int sched_waitpid(int pid, int *wstatus, int options)
                     goto done;
             }
         }
-
         mutex_unlock(&sched_lock);
+
         if (!found)
             return -ECHILD;
+        else if (options & 0x1) /* WNOHANG */
+            return 0;
+
         yield_thread();
+        if (signal_pending())
+            return -EINTR;
     }
 
 done:
