@@ -14,7 +14,6 @@
 
 void sys_exit(struct exception *e)
 {
-    printk("pid %d exited with status %d\n", proc->pid, e->ebx & 0xff);
     sched_terminate(e->ebx & 0xff);
 }
 
@@ -147,22 +146,22 @@ void syscall(struct exception *e)
     case 0:
         sys_exit(e);
     case 1:
-        e->eax = sys_waitpid(e);
+        e->eax = sys_fork(e);
         break;
     case 2:
-        e->eax = sys_alarm(e);
+        e->eax = sys_execve(e);
         break;
     case 3:
-        e->eax = sys_kill(e);
+        e->eax = sys_waitpid(e);
         break;
     case 4:
         e->eax = sys_signal(e);
         break;
-    case 11:
-        e->eax = sys_execve(e);
+    case 5:
+        e->eax = sys_alarm(e);
         break;
-    case 12:
-        e->eax = sys_fork(e);
+    case 6:
+        e->eax = sys_kill(e);
         break;
     case 69:
         // TEMPORARY

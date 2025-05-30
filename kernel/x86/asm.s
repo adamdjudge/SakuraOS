@@ -207,7 +207,7 @@ execve:
     push 0
     push 0
 
-    mov eax, 11 ; temporary execve value
+    mov eax, 2
     mov ebx, [esp+12]
     mov ecx, [esp+16]
     mov edx, [esp+20]
