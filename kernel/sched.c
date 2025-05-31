@@ -328,20 +328,11 @@ int sched_waitpid(int pid, int *wstatus, int options)
         for (p = procs; p < procs + NPROCS; p++) {
             if (p->state == PS_NONE || p->ppid != proc->pid)
                 continue;
-
-            if (pid < -1 && p->pgid == -pid) {
-                found = true;
-                if (p->state == PS_ZOMBIE)
-                    goto done;
-            } else if (pid == -1) {
-                found = true;
-                if (p->state == PS_ZOMBIE)
-                    goto done;
-            } else if (pid == 0 && p->pgid == proc->pgid) {
-                found = true;
-                if (p->state == PS_ZOMBIE)
-                    goto done;
-            } else if (p->pid == pid) {
+            else if ((pid < -1 && p->pgid == -pid)
+                     || pid == -1
+                     || (pid == 0 && p->pgid == proc->pgid)
+                     || p->pid == pid)
+            {
                 found = true;
                 if (p->state == PS_ZOMBIE)
                     goto done;
