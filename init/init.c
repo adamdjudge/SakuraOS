@@ -1,34 +1,23 @@
 #include <sys/types.h>
 #include <unistd.h>
-#include <signal.h>
-
-void handle_timer_parent()
-{
-    signal(SIGALRM, handle_timer_parent);
-    alarm(1);
-    print("hello from parent!\n");
-}
-
-void handle_timer_child()
-{
-    signal(SIGALRM, handle_timer_child);
-    alarm(3);
-    print("hello from child!\n");
-}
 
 int main()
 {
-    int ret = fork();
-    if (ret < 0) {
-        print("fork failed\n");
-        _exit(-1);
-    } else if (ret == 0) {
-        signal(SIGALRM, handle_timer_child);
-        alarm(3);
-    } else {
-        signal(SIGALRM, handle_timer_parent);
-        alarm(1);
+    int fd;
+    ssize_t len;
+    char buf[17];
+
+    fd = open("test.txt", O_RDONLY);
+    if (fd < 0) {
+        print("open failed\n");
+        return -1;
     }
-    for (;;);
-    return 0;
+
+    do {
+        len = read(fd, buf, 16);
+        buf[len] = 0;
+        print(buf);
+    } while (len > 0);
+
+    return close(fd);
 }

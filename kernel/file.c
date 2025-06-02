@@ -6,17 +6,19 @@
 
 #include <kernel.h>
 #include <fs.h>
+#include <sched.h>
+#include <x86.h>
 
 static struct file files[NUM_FILES];
 static mutex_t files_lock;
 
-int open(struct file **fp, char *path, unsigned int mode, unsigned int flags)
+int open(char *path, unsigned int flags, unsigned int creat_mode)
 {
     struct file *f;
-    int ret;
+    int fd, ret;
 
-    if (mode > O_RDWR)
-        return -1; /* invalid */
+    if ((flags & O_ACCMODE) == O_INVALID_ACCMODE)
+        return -EINVAL;
 
     mutex_lock(&files_lock);
     for (f = files; f < files + NUM_FILES; f++) {
@@ -27,43 +29,68 @@ int open(struct file **fp, char *path, unsigned int mode, unsigned int flags)
     }
     mutex_unlock(&files_lock);
     if (f == files + NUM_FILES)
-        return -1; /* too many open files */
+        return -ENFILE;
 
+    mutex_lock(&proc->files_lock);
+    for (fd = 0; fd < OPEN_MAX; fd++) {
+        if (proc->files[fd] == 0) {
+            proc->files[fd] = f;
+            break;
+        }
+    }
+    mutex_unlock(&proc->files_lock);
+    if (fd == OPEN_MAX) {
+        f->count = 0;
+        return EMFILE;
+    }
+
+    /* TODO: create file if path not found and O_CREAT specified */
     ret = ilookup(&f->inode, path);
-    if (ret)
+    if (ret) {
+        proc->files[fd] = NULL;
+        f->count = 0;
         return ret;
+    }
 
-    f->mode = mode;
     f->flags = flags;
     f->pos = 0;
 
     /* TODO: char dev driver open */
 
-    *fp = f;
+    return fd;
+}
+
+int close(int fd)
+{
+    struct file *f;
+
+    if (fd < 0 || fd >= OPEN_MAX || proc->files[fd] == NULL)
+        return -EBADF;
+    f = proc->files[fd];
+    proc->files[fd] = NULL;
+
+    /* TODO: char dev driver close */
+
+    iput(f->inode);
+    dec_dword(&f->count);
     return 0;
 }
 
-void close(struct file *fp)
+int read(int fd, char *buf, unsigned int length)
 {
-    /* TODO: char dev driver close */
-
-    iput(fp->inode);
-    mutex_lock(&fp->lock);
-    fp->count--;
-    mutex_unlock(&fp->lock);
-}
-
-int read(struct file *fp, char *buf, unsigned int length)
-{
+    struct file *f;
     int ret;
 
-    if (fp->mode == O_WRONLY)
-        return -1; /* not opened for reading */
-    if (fp->pos >= fp->inode->size)
-        return 0;
+    if (fd < 0 || fd >= OPEN_MAX || proc->files[fd] == NULL)
+        return -EBADF;
+    f = proc->files[fd];
 
-    ret = iread(fp->inode, buf, fp->pos, length);
-    if (ret > 0)
-        fp->pos += ret;
+    if ((f->flags & O_ACCMODE) == O_WRONLY)
+        return -EBADF;
+
+    mutex_lock(&f->lock);
+    ret = iread(f->inode, buf, f->pos, length);
+    f->pos += ret;
+    mutex_unlock(&f->lock);
     return ret;
 }

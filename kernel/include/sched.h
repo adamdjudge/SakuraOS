@@ -52,33 +52,35 @@ enum {
  */
 struct proc {
     /* Process memory management */
-    uint32_t *pdir;             /* Page directory */
-    uint32_t cr3;               /* Page directory physical address */
-    mutex_t mm_lock;            /* Lock for memory management */
-    struct vmap vmaps[NVMAPS];  /* Virtual memory mappings */
+    uint32_t *pdir;               /* Page directory */
+    uint32_t cr3;                 /* Page directory physical address */
+    mutex_t mm_lock;              /* Lock for memory management */
+    struct vmap vmaps[NVMAPS];    /* Virtual memory mappings */
 
-    unsigned int state;         /* Process state */
-    unsigned int pid;           /* Process ID */
-    unsigned int ppid;          /* Parent process ID */
-    unsigned int pgid;          /* Process group ID */
-    unsigned int sid;           /* Session ID */
-    unsigned int uid;           /* User ID */
-    unsigned int gid;           /* Group ID */
-    unsigned int euid;          /* Effective user ID */
-    unsigned int egid;          /* Effective group ID */
-    unsigned int alarm;         /* Alarm clock set by task */
-    unsigned int rtime;         /* Real time elapsed in millis */
-    unsigned int ktime;         /* Kernel time elapsed in millis */
-    unsigned int utime;         /* User time elapsed in millis */
-    unsigned int next_tid;      /* Next thread ID */
-    unsigned int nthreads;      /* Number of threads */
-    unsigned int signal;        /* Signal bit field */
-    int exit_status;            /* Exit status for waitpid */
+    unsigned int state;           /* Process state */  
+    unsigned int pid;             /* Process ID */  
+    unsigned int ppid;            /* Parent process ID */  
+    unsigned int pgid;            /* Process group ID */  
+    unsigned int sid;             /* Session ID */  
+    unsigned int uid;             /* User ID */  
+    unsigned int gid;             /* Group ID */  
+    unsigned int euid;            /* Effective user ID */  
+    unsigned int egid;            /* Effective group ID */  
+    unsigned int alarm;           /* Alarm clock set by task */
+    unsigned int rtime;           /* Real time elapsed in millis */
+    unsigned int ktime;           /* Kernel time elapsed in millis */
+    unsigned int utime;           /* User time elapsed in millis */
+    unsigned int next_tid;        /* Next thread ID */  
+    unsigned int nthreads;        /* Number of threads */  
+    unsigned int signal;          /* Signal bit field */  
+    int exit_status;              /* Exit status for waitpid */
 
-    struct inode *exe;          /* Executable file */
-    struct inode *cwd;          /* Current working directory */
+    struct inode *exe;            /* Executable file */
+    struct inode *cwd;            /* Current working directory */
 
-    uint32_t sigdisp[32];       /* Signal dispositions */
+    uint32_t sigdisp[32];         /* Signal dispositions */
+    struct file *files[OPEN_MAX]; /* File descriptors */
+    mutex_t files_lock;           /* Lock for file descriptors list */
 };
 
 /**

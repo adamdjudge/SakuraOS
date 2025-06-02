@@ -133,6 +133,21 @@ int sys_fork(struct exception *e)
     return new_proc->pid;
 }
 
+int sys_open(struct exception *e)
+{
+    return open((char *)e->ebx, e->ecx, e->edx);
+}
+
+int sys_close(struct exception *e)
+{
+    return close(e->ebx);
+}
+
+int sys_read(struct exception *e)
+{
+    return read(e->ebx, (char *)e->ecx, e->edx);
+}
+
 extern int sys_execve(struct exception *e);
 
 void syscall(struct exception *e)
@@ -162,6 +177,15 @@ void syscall(struct exception *e)
         break;
     case 6:
         e->eax = sys_kill(e);
+        break;
+    case 7:
+        e->eax = sys_open(e);
+        break;
+    case 8:
+        e->eax = sys_close(e);
+        break;
+    case 9:
+        e->eax = sys_read(e);
         break;
     case 69:
         // TEMPORARY

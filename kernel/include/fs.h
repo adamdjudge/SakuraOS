@@ -92,7 +92,6 @@ struct dentry {
 #define DENTRY_SIZE 16
 
 struct file {
-    unsigned int mode;
     unsigned int flags;
     unsigned int pos;
     unsigned int count;
@@ -101,13 +100,27 @@ struct file {
 };
 
 #define NUM_FILES 64
-#define NUM_OPEN 16
+#define OPEN_MAX 16
 
 enum {
     O_RDONLY,
     O_WRONLY,
-    O_RDWR
+    O_RDWR,
+    O_INVALID_ACCMODE
 };
+
+#define O_ACCMODE  0x3
+#define O_APPEND   (1<<2)
+#define O_CLOEXEC  (1<<3)
+#define O_CREAT    (1<<4)
+#define O_DSYNC    (1<<5)
+#define O_EXCL     (1<<6)
+#define O_NOCTTY   (1<<7)
+#define O_NONBLOCK (1<<8)
+#define O_SYNC     (1<<9)
+#define O_TRUNC    (1<<10)
+
+#define RW_MAX 0x7ffff000
 
 int mount(dev_t dev, struct inode **ip);
 int iget(struct inode **ip, struct superblock *s, unsigned int inum);
@@ -116,8 +129,8 @@ void iput(struct inode *i);
 int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length);
 int ilookup(struct inode **ip, char *path);
 
-int open(struct file **fp, char *path, unsigned int mode, unsigned int flags);
-void close(struct file *fp);
-int read(struct file *fp, char *buf, unsigned int length);
+int open(char *path, unsigned int flags, unsigned int creat_mode);
+int close(int fd);
+int read(int fd, char *buf, unsigned int length);
 
 #endif

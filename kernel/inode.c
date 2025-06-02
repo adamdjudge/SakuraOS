@@ -96,6 +96,17 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
     unsigned int blk, blk_off, devblk, copylen, total = 0;
     dev_t dev;
 
+    if (length > RW_MAX)
+        length = RW_MAX;
+
+    mutex_lock(&i->lock);
+    if (offset >= i->size) {
+        mutex_unlock(&i->lock);
+        return 0;
+    } else if (offset + length >= i->size) {
+        length = i->size - offset;
+    }
+
     while (total < length) {
         blk = (offset + total) / BLOCKSIZE;
         blk_off = (offset + total) % BLOCKSIZE;
@@ -107,12 +118,15 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
             dev = i->zones[0];
             devblk = blk;
         } else {
-            return -1; /* TODO: char devices, etc. */
+            mutex_unlock(&i->lock);
+            return -ENOSYS; /* TODO: char devices, etc. */
         }
 
         b = readblk(dev, devblk);
-        if (!b)
-            return total;
+        if (!b) {
+            mutex_unlock(&i->lock);
+            return total > 0 ? total : -EIO; /* TODO: error from driver */
+        }
         copylen = MIN(BLOCKSIZE - blk_off, MIN(length - total, BLOCKSIZE));
         memcpy(buf + total, b->data + blk_off, copylen);
 
@@ -120,6 +134,7 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
         total += copylen;
     }
 
+    mutex_unlock(&i->lock);
     return total;
 }
 

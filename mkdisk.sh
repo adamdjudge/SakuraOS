@@ -22,6 +22,7 @@ sudo mkdir /mnt/dev
 sudo mknod /mnt/dev/fd0 b 2 0
 sudo mkdir /mnt/bin
 sudo cp init/init /mnt/bin/
+sudo cp test.txt /mnt
 
 sudo umount /mnt
 
