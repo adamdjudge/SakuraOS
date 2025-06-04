@@ -20,6 +20,7 @@ int execve(const char *, char *const [], char *const []);
 void _exit(int);
 pid_t fork(void);
 ssize_t read(int, void *, size_t);
+ssize_t write(int, const void *, size_t);
 
 /* Temporary debug syscall */
 void print(char *);

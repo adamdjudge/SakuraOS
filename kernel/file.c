@@ -94,3 +94,24 @@ int read(int fd, char *buf, unsigned int length)
     mutex_unlock(&f->lock);
     return ret;
 }
+
+int write(int fd, char *buf, unsigned int length)
+{
+    struct file *f;
+    int ret;
+
+    if (fd < 0 || fd >= OPEN_MAX || proc->files[fd] == NULL)
+        return -EBADF;
+    f = proc->files[fd];
+
+    if ((f->flags & O_ACCMODE) == O_RDONLY)
+        return -EBADF;
+
+    mutex_lock(&f->lock);
+    if (f->flags & O_APPEND)
+        f->pos = f->inode->size;
+    ret = iwrite(f->inode, buf, f->pos, length);
+    f->pos += ret;
+    mutex_unlock(&f->lock);
+    return ret;
+}

@@ -8,6 +8,7 @@
 #include <fs.h>
 #include <blkdev.h>
 #include <buffer.h>
+#include <chrdev.h>
 #include <sched.h>
 #include <x86.h>
 
@@ -136,6 +137,36 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
 
     mutex_unlock(&i->lock);
     return total;
+}
+
+int iwrite(struct inode *i, void *buf, unsigned int offset, unsigned int length)
+{
+    int ret;
+    dev_t dev;
+
+    if (length > RW_MAX)
+        length = RW_MAX;
+
+    mutex_lock(&i->lock);
+    if (MODE_TYPE(i->mode) == IFBLK) {
+        if (offset >= i->size) {
+            mutex_unlock(&i->lock);
+            return 0;
+        } else if (offset + length >= i->size) {
+            length = i->size - offset;
+        }
+    }
+
+    if (MODE_TYPE(i->mode) == IFCHR) {
+        dev = i->zones[0];
+        ret = writechr(dev, buf, length);
+        mutex_unlock(&i->lock);
+        return ret;
+    }
+
+    /* TODO: write to other things */
+    mutex_unlock(&i->lock);
+    return -ENOSYS;
 }
 
 static int scandir(struct inode **ip, struct inode *dir, char *name, int len)

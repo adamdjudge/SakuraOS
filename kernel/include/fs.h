@@ -127,10 +127,12 @@ int iget(struct inode **ip, struct superblock *s, unsigned int inum);
 struct inode *idup(struct inode *i);
 void iput(struct inode *i);
 int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length);
+int iwrite(struct inode *i, void *buf, unsigned int offset, unsigned int length);
 int ilookup(struct inode **ip, char *path);
 
 int open(char *path, unsigned int flags, unsigned int creat_mode);
 int close(int fd);
 int read(int fd, char *buf, unsigned int length);
+int write(int fd, char *buf, unsigned int length);
 
 #endif

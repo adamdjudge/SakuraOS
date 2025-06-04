@@ -148,6 +148,11 @@ int sys_read(struct exception *e)
     return read(e->ebx, (char *)e->ecx, e->edx);
 }
 
+int sys_write(struct exception *e)
+{
+    return write(e->ebx, (char *)e->ecx, e->edx);
+}
+
 extern int sys_execve(struct exception *e);
 
 void syscall(struct exception *e)
@@ -186,6 +191,9 @@ void syscall(struct exception *e)
         break;
     case 9:
         e->eax = sys_read(e);
+        break;
+    case 10:
+        e->eax = sys_write(e);
         break;
     case 69:
         // TEMPORARY

@@ -20,6 +20,8 @@ sudo mount sakura.img /mnt
 sudo cp kernel/kernel /mnt
 sudo mkdir /mnt/dev
 sudo mknod /mnt/dev/fd0 b 2 0
+sudo mknod /mnt/dev/tty0 c 4 0
+sudo mknod /mnt/dev/tty1 c 4 1
 sudo mkdir /mnt/bin
 sudo cp init/init /mnt/bin/
 sudo cp test.txt /mnt

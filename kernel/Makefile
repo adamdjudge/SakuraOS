@@ -20,6 +20,8 @@ OBJ = \
 	floppy.o \
 	buffer.o \
 	blkdev.o \
+	chrdev.o \
+	tty.o \
 	super.o \
 	inode.o \
 	file.o \
