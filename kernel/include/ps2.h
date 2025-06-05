@@ -1,3 +1,8 @@
+/**
+ * The SakuraOS Kernel
+ * Copyright 2025 Adam Judge
+ */
+
 #ifndef PS2_H
 #define PS2_H
 
@@ -20,9 +25,12 @@
 #define PS2_CONFIG_PORT1_CLK 0x10
 #define PS2_CONFIG_PORT2_CLK 0x20
 
+#define KEYBOARD_CMD_SETLED   0xED
+#define KEYBOARD_CMD_ENABLE   0xF4
+#define KEYBOARD_CMD_DISABLE  0xF5
+#define KEYBOARD_CMD_SELFTEST 0xFF
+
 #define MOUSE_CMD_DEFAULT 0xF6
 #define MOUSE_CMD_ENABLE  0xF4
-
-void Ps2Initialize();
 
 #endif

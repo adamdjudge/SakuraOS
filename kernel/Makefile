@@ -9,6 +9,7 @@ OBJ = \
 	main.o \
 	serial.o \
 	console.o \
+	ps2.o \
 	exception.o \
 	syscall.o \
 	mm.o \

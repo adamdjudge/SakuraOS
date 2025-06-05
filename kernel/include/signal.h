@@ -7,6 +7,8 @@
 #ifndef SIGNAL_H
 #define SIGNAL_H
 
+#include <exception.h>
+
 /**
  * Signal values.
  */

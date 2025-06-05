@@ -12,6 +12,7 @@
 #include <serial.h>
 
 extern void create_init();
+extern void ps2_init();
 
 void kmain()
 {

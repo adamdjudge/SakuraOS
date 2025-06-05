@@ -72,8 +72,11 @@ void console_putc(char c)
         } while (pos % SCREEN_WIDTH != 0);
         break;
     case '\b':
-        if (pos > 0)
+        if (pos > 0) {
             pos--;
+            textmem[2*pos] = ' ';
+            textmem[2*pos+1] = color;
+        }
         break;
     default:
         textmem[2*pos] = c;

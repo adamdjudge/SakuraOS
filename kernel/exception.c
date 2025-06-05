@@ -13,6 +13,7 @@
 #include <signal.h>
 
 extern void handle_timer_irq();
+extern void handle_keyboard_irq();
 extern void handle_floppy_irq();
 extern void floppy_update_timer();
 
@@ -38,7 +39,7 @@ void handle_exception(struct exception e)
         floppy_update_timer();
         break;
     case ENO_IRQ1:
-        // TODO: PS/2 keyboard interrupt
+        handle_keyboard_irq();
         break;
     case ENO_IRQ6:
         handle_floppy_irq();
