@@ -50,7 +50,11 @@ kernel_entry:
     ; First clear out the BSS section. It's a little more complicated to do here
     ; in real mode due to segmentation, but it's best to do it now so that the
     ; rest of the real mode code can use the BSS safely.
-    mov di, _kernel_bss
+    mov eax, _kernel_bss
+    mov di, ax
+    shr eax, 4
+    and ax, 0xf000
+    mov es, ax
     mov ecx, _kernel_end
     sub ecx, _kernel_bss
     shr ecx, 2
