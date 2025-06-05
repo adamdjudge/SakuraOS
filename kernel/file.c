@@ -8,6 +8,7 @@
 #include <fs.h>
 #include <sched.h>
 #include <x86.h>
+#include <chrdev.h>
 
 static struct file files[NUM_FILES];
 static mutex_t files_lock;
@@ -88,9 +89,17 @@ int read(int fd, char *buf, unsigned int length)
     if ((f->flags & O_ACCMODE) == O_WRONLY)
         return -EBADF;
 
+    if (length > RW_MAX)
+        length = RW_MAX;
+
     mutex_lock(&f->lock);
-    ret = iread(f->inode, buf, f->pos, length);
-    f->pos += ret;
+    if (MODE_TYPE(f->inode->mode) == IFCHR)
+        ret = readchr(f->inode->zones[0], buf, length);
+    else
+        ret = iread(f->inode, buf, f->pos, length);
+
+    if (ret >= 0)
+        f->pos += ret;
     mutex_unlock(&f->lock);
     return ret;
 }
@@ -107,11 +116,20 @@ int write(int fd, char *buf, unsigned int length)
     if ((f->flags & O_ACCMODE) == O_RDONLY)
         return -EBADF;
 
+    if (length > RW_MAX)
+        length = RW_MAX;
+
     mutex_lock(&f->lock);
     if (f->flags & O_APPEND)
         f->pos = f->inode->size;
-    ret = iwrite(f->inode, buf, f->pos, length);
-    f->pos += ret;
+
+    if (MODE_TYPE(f->inode->mode) == IFCHR)
+        ret = writechr(f->inode->zones[0], buf, length);
+    else
+        ret = iwrite(f->inode, buf, f->pos, length);
+
+    if (ret >= 0)
+        f->pos += ret;
     mutex_unlock(&f->lock);
     return ret;
 }

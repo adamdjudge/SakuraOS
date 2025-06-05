@@ -97,9 +97,6 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
     unsigned int blk, blk_off, devblk, copylen, total = 0;
     dev_t dev;
 
-    if (length > RW_MAX)
-        length = RW_MAX;
-
     mutex_lock(&i->lock);
     if (offset >= i->size) {
         mutex_unlock(&i->lock);
@@ -120,7 +117,7 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
             devblk = blk;
         } else {
             mutex_unlock(&i->lock);
-            return -ENOSYS; /* TODO: char devices, etc. */
+            return -ENOSYS;
         }
 
         b = readblk(dev, devblk);
@@ -141,12 +138,6 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
 
 int iwrite(struct inode *i, void *buf, unsigned int offset, unsigned int length)
 {
-    int ret;
-    dev_t dev;
-
-    if (length > RW_MAX)
-        length = RW_MAX;
-
     mutex_lock(&i->lock);
     if (MODE_TYPE(i->mode) == IFBLK) {
         if (offset >= i->size) {
@@ -155,13 +146,6 @@ int iwrite(struct inode *i, void *buf, unsigned int offset, unsigned int length)
         } else if (offset + length >= i->size) {
             length = i->size - offset;
         }
-    }
-
-    if (MODE_TYPE(i->mode) == IFCHR) {
-        dev = i->zones[0];
-        ret = writechr(dev, buf, length);
-        mutex_unlock(&i->lock);
-        return ret;
     }
 
     /* TODO: write to other things */
