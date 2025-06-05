@@ -195,10 +195,6 @@ void syscall(struct exception *e)
     case 10:
         e->eax = sys_write(e);
         break;
-    case 69:
-        // TEMPORARY
-        printk("%s", (char*)e->ebx);
-        break;
     default:
         printk("pid %d tried invalid syscall %d\n", proc->pid, e->eax);
         e->eax = -ENOSYS;
