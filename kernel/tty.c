@@ -12,6 +12,7 @@
 
 struct tty {
     mutex_t lock;
+    struct thread *waiting;
     int flags;
     unsigned int head;
     unsigned int tail;
@@ -34,40 +35,35 @@ extern void tty_handle_input(uint8_t minor, char c)
 
     if (minor == 0)
         console_putc(c);
+    if (c == '\n' && tty->waiting)
+        tty->waiting->state = TS_RUNNING;
 }
 
 int tty_read(uint8_t minor, char *buf, unsigned int length)
 {
     struct tty *tty;
-    int i, count = 0;
+    int count = 0;
 
     if (minor >= NUM_TTYS)
         return -ENODEV;
     tty = &ttys[minor];
+
     mutex_lock(&tty->lock);
-    
-    for (;;) {
-        for (i = tty->tail; i != tty->head; i = (i+1) % sizeof(tty->buffer)) {
-            if (tty->buffer[i] == '\n') {
-                while (tty->tail != (i+1) % sizeof(tty->buffer)
-                       && count < length)
-                {
-                    *buf++ = tty->buffer[tty->tail++];
-                    tty->tail %= sizeof(tty->buffer);
-                    count++;
-                }
+    tty->waiting = thread;
+    block_thread_interruptible();
+    if (signal_pending())
+        return -EINTR;
 
-                mutex_unlock(&tty->lock);
-                return count;
-            }
-        }
-
-        yield_thread();
-        if (signal_pending()) {
-            mutex_unlock(&tty->lock);
-            return -EINTR;
-        }
+    while (count < length && tty->tail != tty->head) {
+        *buf = tty->buffer[tty->tail++];
+        tty->tail %= sizeof(tty->buffer);
+        count++;
+        if (*buf++ == '\n')
+            break;
     }
+
+    mutex_unlock(&tty->lock);
+    return count;
 }
 
 int tty_write(uint8_t minor, char *buf, unsigned int length)
