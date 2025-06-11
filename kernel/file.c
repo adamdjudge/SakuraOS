@@ -103,14 +103,23 @@ int read(int fd, char *buf, unsigned int length)
     if (setpos)
         mutex_lock(&f->lock);
 
-    if (MODE_TYPE(f->inode->mode) == IFCHR)
+    switch(MODE_TYPE(f->inode->mode)) {
+    case IFCHR:
         ret = readchr(f->inode->zones[0], buf, length);
-    else
+        break;
+    case IFREG:
+    case IFBLK:
         ret = iread(f->inode, buf, f->pos, length);
+        break;
+    default:
+        ret = -ENOSYS;
+        goto done;
+    }
 
     if (setpos && ret >= 0)
         f->pos += ret;
 
+done:
     if (setpos)
         mutex_unlock(&f->lock);
     return ret;
@@ -145,14 +154,23 @@ int write(int fd, char *buf, unsigned int length)
             f->pos = f->inode->size;
     }
 
-    if (MODE_TYPE(f->inode->mode) == IFCHR)
+    switch(MODE_TYPE(f->inode->mode)) {
+    case IFCHR:
         ret = writechr(f->inode->zones[0], buf, length);
-    else
+        break;
+    case IFREG:
+    case IFBLK:
         ret = iwrite(f->inode, buf, f->pos, length);
+        break;
+    default:
+        ret = -ENOSYS;
+        goto done;
+    }
 
     if (setpos && ret >= 0)
         f->pos += ret;
 
+done:
     if (setpos)
         mutex_unlock(&f->lock);
     return ret;
