@@ -80,6 +80,7 @@ int close(int fd)
 int read(int fd, char *buf, unsigned int length)
 {
     struct file *f;
+    bool setpos;
     int ret;
 
     if (fd < 0 || fd >= OPEN_MAX || proc->files[fd] == NULL)
@@ -92,21 +93,33 @@ int read(int fd, char *buf, unsigned int length)
     if (length > RW_MAX)
         length = RW_MAX;
 
-    mutex_lock(&f->lock);
+    /* Don't set position for non-seekable streams, in which case we also don't
+     * wait on a lock for the file; this allows signals to interrupt the read
+     * on this "slow" device. */
+    setpos = MODE_TYPE(f->inode->mode) != IFIFO &&
+             MODE_TYPE(f->inode->mode) != IFCHR &&
+             MODE_TYPE(f->inode->mode) != IFSOCK;
+
+    if (setpos)
+        mutex_lock(&f->lock);
+
     if (MODE_TYPE(f->inode->mode) == IFCHR)
         ret = readchr(f->inode->zones[0], buf, length);
     else
         ret = iread(f->inode, buf, f->pos, length);
 
-    if (ret >= 0)
+    if (setpos && ret >= 0)
         f->pos += ret;
-    mutex_unlock(&f->lock);
+
+    if (setpos)
+        mutex_unlock(&f->lock);
     return ret;
 }
 
 int write(int fd, char *buf, unsigned int length)
 {
     struct file *f;
+    bool setpos;
     int ret;
 
     if (fd < 0 || fd >= OPEN_MAX || proc->files[fd] == NULL)
@@ -119,17 +132,28 @@ int write(int fd, char *buf, unsigned int length)
     if (length > RW_MAX)
         length = RW_MAX;
 
-    mutex_lock(&f->lock);
-    if (f->flags & O_APPEND)
-        f->pos = f->inode->size;
+    /* Don't set position for non-seekable streams, in which case we also don't
+     * wait on a lock for the file; this allows signals to interrupt the write
+     * on this "slow" device. */
+    setpos = MODE_TYPE(f->inode->mode) != IFIFO &&
+             MODE_TYPE(f->inode->mode) != IFCHR &&
+             MODE_TYPE(f->inode->mode) != IFSOCK;
+
+    if (setpos) {
+        mutex_lock(&f->lock);
+        if (f->flags & O_APPEND)
+            f->pos = f->inode->size;
+    }
 
     if (MODE_TYPE(f->inode->mode) == IFCHR)
         ret = writechr(f->inode->zones[0], buf, length);
     else
         ret = iwrite(f->inode, buf, f->pos, length);
 
-    if (ret >= 0)
+    if (setpos && ret >= 0)
         f->pos += ret;
-    mutex_unlock(&f->lock);
+
+    if (setpos)
+        mutex_unlock(&f->lock);
     return ret;
 }
