@@ -7,6 +7,7 @@
 #include <console.h>
 #include <sched.h>
 #include <signal.h>
+#include <x86.h>
 
 #define NUM_TTYS 3
 
@@ -17,10 +18,14 @@ struct tty {
     unsigned int head;
     unsigned int tail;
     char buffer[256];
+    unsigned int avail;
 };
 
 struct tty ttys[NUM_TTYS];
 
+/*
+ * Runs in interrupt context when a character is received.
+ */
 extern void tty_handle_input(uint8_t minor, char c)
 {
     struct tty *tty = &ttys[minor];
@@ -35,8 +40,11 @@ extern void tty_handle_input(uint8_t minor, char c)
 
     if (minor == 0)
         console_putc(c);
-    if (c == '\n' && tty->waiting)
-        tty->waiting->state = TS_RUNNING;
+    if (c == '\n') {
+        tty->avail++;
+        if (tty->waiting)
+            tty->waiting->state = TS_RUNNING;
+    }
 }
 
 int tty_read(uint8_t minor, char *buf, unsigned int length)
@@ -49,17 +57,24 @@ int tty_read(uint8_t minor, char *buf, unsigned int length)
     tty = &ttys[minor];
 
     mutex_lock(&tty->lock);
-    tty->waiting = thread;
-    block_thread_interruptible();
-    if (signal_pending())
-        return -EINTR;
+    if (tty->avail == 0) {
+        tty->waiting = thread;
+        block_thread_interruptible();
+        tty->waiting = NULL;
+        if (signal_pending()) {
+            mutex_unlock(&tty->lock);
+            return -EINTR;
+        }
+    }
 
     while (count < length && tty->tail != tty->head) {
         *buf = tty->buffer[tty->tail++];
         tty->tail %= sizeof(tty->buffer);
         count++;
-        if (*buf++ == '\n')
+        if (*buf++ == '\n') {
+            dec_dword(&tty->avail);
             break;
+        }
     }
 
     mutex_unlock(&tty->lock);
