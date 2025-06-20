@@ -7,8 +7,8 @@ cd kernel
 make || exit 1
 cd ../lib
 make || exit 1
-cd ../init
-make || exit 1
+cd ../bin
+./mkbins.sh || exit 1
 cd ../boot
 nasm -o bootsect.bin -f bin boot.s || exit 1
 cd ..
@@ -22,8 +22,7 @@ sudo mkdir /mnt/dev
 sudo mknod /mnt/dev/fd0 b 2 0
 sudo mknod /mnt/dev/tty0 c 4 0
 sudo mknod /mnt/dev/tty1 c 4 1
-sudo mkdir /mnt/bin
-sudo cp init/init /mnt/bin/
+sudo cp -r bin /mnt
 sudo cp test.txt /mnt
 
 sudo umount /mnt

@@ -2,8 +2,8 @@
 
 cd kernel
 make clean
-cd ../init
-make clean
+cd ../bin
+./cleanbins.sh
 cd ../lib
 make clean
 cd ../boot
