@@ -9,3 +9,5 @@ function build() {
 }
 
 build init
+build sh
+build hello

@@ -4,22 +4,20 @@
 
 int main()
 {
-    int fd, count;
-    char buf[16];
+    int fd;
 
-    fd = open("/dev/tty0", O_RDWR);
+    if ((fd = open("/dev/tty0", O_RDWR)) < 0)
+        return 1;
     dup(fd);
     dup(fd);
 
-    for (;;) {
-        count = read(STDIN_FILENO, buf, 16);
-        if (count == 1 && buf[0] == '\n')
-            break;
-        write(STDOUT_FILENO, "read: ", 6);
-        write(STDOUT_FILENO, buf, count);
-        if (buf[count-1] != '\n')
-            write(STDOUT_FILENO, "\n", 1);
+    if (fork() == 0) {
+        execve("/bin/sh", NULL, NULL);
+        write(STDERR_FILENO, "init: could not start shell\n", 28);
+        return 2;
+    } else {
+        for (;;);
     }
 
-    return close(fd);
+    return 0;
 }
