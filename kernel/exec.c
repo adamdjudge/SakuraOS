@@ -121,12 +121,17 @@ int sys_execve(struct exception *e)
     proc->rtime = 0;
     proc->ktime = 0;
     proc->utime = 0;
+    thread->tid = 1;
+    proc->next_tid = 2;
+
     for (i = 0; i < 32; i++) {
         if (proc->sigdisp[i] > SIG_IGN)
             proc->sigdisp[i] = SIG_DFL;
     }
-    thread->tid = 1;
-    proc->next_tid = 2;
+    for (i = 0; i < OPEN_MAX; i++) {
+        if (proc->files[i] && (proc->files[i]->flags & O_CLOEXEC))
+            close(i);
+    }
 
     e->cs = 0x1B;
     e->ds = 0x23;

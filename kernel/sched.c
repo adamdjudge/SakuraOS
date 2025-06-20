@@ -284,6 +284,7 @@ void sched_stop_other_threads()
 void sched_terminate(int exit_status)
 {
     struct proc *p, *pp;
+    int i;
 
     printk("pid %d exiting with status 0x%x\n", proc->pid, exit_status);
 
@@ -305,13 +306,16 @@ void sched_terminate(int exit_status)
         send_proc_signal(pp, SIGCHLD);
 
     mm_free_proc_memory();
-
     iput(proc->exe);
     iput(proc->cwd);
+    for (i = 0; i < OPEN_MAX; i++) {
+        if (proc->files[i])
+            close(i);
+    }
+
     proc->exit_status = exit_status;
     proc->state = PS_ZOMBIE;
     thread->state = TS_NONE;
-
     yield_thread();
 }
 

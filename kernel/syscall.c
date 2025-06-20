@@ -88,6 +88,7 @@ int sys_fork(struct exception *e)
     struct proc *new_proc;
     struct thread *new_thread;
     struct init_kstack *kstack;
+    int i;
 
     new_proc = create_proc();
     if (!new_proc) {
@@ -120,6 +121,12 @@ int sys_fork(struct exception *e)
     new_proc->cwd = idup(proc->cwd);
     new_proc->exe = idup(proc->exe);
     memcpy(new_proc->sigdisp, proc->sigdisp, sizeof(proc->sigdisp));
+
+    for (i = 0; i < OPEN_MAX; i++) {
+        new_proc->files[i] = proc->files[i];
+        if (proc->files[i])
+            inc_dword(&proc->files[i]->count);
+    }
 
     new_thread->sigmask = thread->sigmask;
     new_thread->esp -= sizeof(struct init_kstack);
