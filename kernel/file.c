@@ -77,6 +77,28 @@ int close(int fd)
     return 0;
 }
 
+int dup(int fd)
+{
+    struct file *f;
+    int i;
+
+    if (fd < 0 || fd >= OPEN_MAX || proc->files[fd] == NULL)
+        return -EBADF;
+    f = proc->files[fd];
+
+    mutex_lock(&proc->files_lock);
+    for (i = 0; i < OPEN_MAX; i++) {
+        if (proc->files[i] == NULL) {
+            proc->files[i] = f;
+            inc_dword(&f->count);
+            break;
+        }
+    }
+    mutex_unlock(&proc->files_lock);
+
+    return i == OPEN_MAX ? -EMFILE : i;
+}
+
 int read(int fd, char *buf, unsigned int length)
 {
     struct file *f;

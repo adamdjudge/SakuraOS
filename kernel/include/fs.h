@@ -134,5 +134,6 @@ int open(char *path, unsigned int flags, unsigned int creat_mode);
 int close(int fd);
 int read(int fd, char *buf, unsigned int length);
 int write(int fd, char *buf, unsigned int length);
+int dup(int fd);
 
 #endif

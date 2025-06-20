@@ -16,6 +16,7 @@
 
 unsigned int alarm(unsigned int);
 int close(int);
+int dup(int);
 int execve(const char *, char *const [], char *const []);
 void _exit(int);
 pid_t fork(void);

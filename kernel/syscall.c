@@ -160,6 +160,11 @@ int sys_write(struct exception *e)
     return write(e->ebx, (char *)e->ecx, e->edx);
 }
 
+int sys_dup(struct exception *e)
+{
+    return dup(e->ebx);
+}
+
 extern int sys_execve(struct exception *e);
 
 void syscall(struct exception *e)
@@ -201,6 +206,9 @@ void syscall(struct exception *e)
         break;
     case 10:
         e->eax = sys_write(e);
+        break;
+    case 11:
+        e->eax = sys_dup(e);
         break;
     default:
         printk("pid %d tried invalid syscall %d\n", proc->pid, e->eax);

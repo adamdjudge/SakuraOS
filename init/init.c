@@ -8,14 +8,17 @@ int main()
     char buf[16];
 
     fd = open("/dev/tty0", O_RDWR);
+    dup(fd);
+    dup(fd);
+
     for (;;) {
-        count = read(fd, buf, 16);
+        count = read(STDIN_FILENO, buf, 16);
         if (count == 1 && buf[0] == '\n')
             break;
-        write(fd, "read: ", 6);
-        write(fd, buf, count);
+        write(STDOUT_FILENO, "read: ", 6);
+        write(STDOUT_FILENO, buf, count);
         if (buf[count-1] != '\n')
-            write(fd, "\n", 1);
+            write(STDOUT_FILENO, "\n", 1);
     }
 
     return close(fd);

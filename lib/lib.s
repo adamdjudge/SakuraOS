@@ -141,3 +141,4 @@ syscall3 7, open
 syscall1 8, close
 syscall3 9, read
 syscall3 10, write
+syscall1 11, dup
