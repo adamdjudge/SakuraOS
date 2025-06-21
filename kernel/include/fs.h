@@ -44,7 +44,7 @@ struct inode {
     unsigned short zones[9];
 
     /* Not stored on disk */
-    mutex_t lock;
+    spinlock_t lock;
     dev_t dev;
     unsigned int inum;
     unsigned int count;
@@ -96,7 +96,7 @@ struct file {
     unsigned int pos;
     unsigned int count;
     struct inode *inode;
-    mutex_t lock;
+    spinlock_t lock;
 };
 
 #define NUM_FILES 64

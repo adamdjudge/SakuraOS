@@ -54,7 +54,7 @@ struct proc {
     /* Process memory management */
     uint32_t *pdir;               /* Page directory */
     uint32_t cr3;                 /* Page directory physical address */
-    mutex_t mm_lock;              /* Lock for memory management */
+    spinlock_t mm_lock;              /* Lock for memory management */
     struct vmap vmaps[NVMAPS];    /* Virtual memory mappings */
 
     unsigned int state;           /* Process state */  
@@ -80,7 +80,7 @@ struct proc {
 
     uint32_t sigdisp[32];         /* Signal dispositions */
     struct file *files[OPEN_MAX]; /* File descriptors */
-    mutex_t files_lock;           /* Lock for file descriptors list */
+    spinlock_t files_lock;           /* Lock for file descriptors list */
 };
 
 /**

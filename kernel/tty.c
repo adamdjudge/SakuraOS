@@ -12,7 +12,7 @@
 #define NUM_TTYS 3
 
 struct tty {
-    mutex_t lock;
+    spinlock_t lock;
     struct thread *waiting;
     int flags;
     unsigned int head;
@@ -56,13 +56,13 @@ int tty_read(uint8_t minor, char *buf, unsigned int length)
         return -ENODEV;
     tty = &ttys[minor];
 
-    mutex_lock(&tty->lock);
+    spin_lock(&tty->lock);
     if (tty->avail == 0) {
         tty->waiting = thread;
         block_thread_interruptible();
         tty->waiting = NULL;
         if (signal_pending()) {
-            mutex_unlock(&tty->lock);
+            spin_unlock(&tty->lock);
             return -EINTR;
         }
     }
@@ -77,7 +77,7 @@ int tty_read(uint8_t minor, char *buf, unsigned int length)
         }
     }
 
-    mutex_unlock(&tty->lock);
+    spin_unlock(&tty->lock);
     return count;
 }
 
@@ -88,7 +88,7 @@ int tty_write(uint8_t minor, char *buf, unsigned int length)
     if (minor >= NUM_TTYS)
         return -ENODEV;
 
-    mutex_lock(&ttys[minor].lock);
+    spin_lock(&ttys[minor].lock);
     if (minor == 0) {
         for (i = 0; i < length; i++)
             console_putc(buf[i]);
@@ -96,6 +96,6 @@ int tty_write(uint8_t minor, char *buf, unsigned int length)
     } else {
         ret = -ENODEV;
     }
-    mutex_unlock(&ttys[minor].lock);
+    spin_unlock(&ttys[minor].lock);
     return ret;
 }

@@ -10,7 +10,7 @@
 #include <blkdev.h>
 
 static struct superblock supers[NUM_SUPERS];
-static mutex_t supers_lock;
+static spinlock_t supers_lock;
 
 int mount(dev_t dev, struct inode **ip)
 {
@@ -18,19 +18,19 @@ int mount(dev_t dev, struct inode **ip)
     struct buffer *b;
     int ret;
 
-    mutex_lock(&supers_lock);
+    spin_lock(&supers_lock);
 
     for (s = supers; s < supers + NUM_SUPERS; s++) {
         if (s->dev == 0)
             break;
     }
     if (s == supers + NUM_SUPERS) {
-        mutex_unlock(&supers_lock);
+        spin_unlock(&supers_lock);
         return -1; // too many mounted volumes
     }
 
     s->dev = dev;
-    mutex_unlock(&supers_lock);
+    spin_unlock(&supers_lock);
 
     b = readblk(dev, 1);
     if (!b) {

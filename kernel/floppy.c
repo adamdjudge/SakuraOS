@@ -31,7 +31,7 @@ static struct geom floppy_geom = {
 static bool got_irq;
 static int cur_cyl;
 static int motor_timer;
-static mutex_t floppy_lock;
+static spinlock_t floppy_lock;
 
 static uint8_t *dma_buffer = (uint8_t*) 0x1000;
 
@@ -205,7 +205,7 @@ static bool floppy_io(void *buffer, uint8_t drive, struct chs *chs, int nblk,
     int rem_sect, cmd_nblk;
     bool ret = true;
 
-    mutex_lock(&floppy_lock);
+    spin_lock(&floppy_lock);
     motor_timer = 0; /* Ensure motor isn't turned off during operation */
     set_motor(drive, true);
 
@@ -245,7 +245,7 @@ static bool floppy_io(void *buffer, uint8_t drive, struct chs *chs, int nblk,
 
 end:
     motor_timer = 200; /* Start countdown to shutoff. */
-    mutex_unlock(&floppy_lock);
+    spin_unlock(&floppy_lock);
     return ret;
 }
 

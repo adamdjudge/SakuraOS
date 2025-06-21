@@ -32,7 +32,7 @@ struct thread *next_thread;
 static unsigned int next_pid;
 static unsigned int schedule_timer;
 static unsigned int njiffies;
-static mutex_t sched_lock;
+static spinlock_t sched_lock;
 
 void sched_init()
 {
@@ -181,19 +181,19 @@ struct proc *create_proc()
 {
     struct proc *p;
 
-    mutex_lock(&sched_lock);
+    spin_lock(&sched_lock);
 
     for (p = procs; p < procs + NPROCS; p++) {
         if (p->state == PS_NONE)
             break;
     }
     if (p == procs + NPROCS) {
-        mutex_unlock(&sched_lock);
+        spin_unlock(&sched_lock);
         return NULL;
     }
 
     p->state = PS_RUNNING;
-    mutex_unlock(&sched_lock);
+    spin_unlock(&sched_lock);
 
     p->pid = next_pid++;
     p->alarm = 0;
@@ -216,19 +216,19 @@ struct thread *create_thread(struct proc *proc)
 {
     struct thread *t;
 
-    mutex_lock(&sched_lock);
+    spin_lock(&sched_lock);
 
     for (t = threads; t < threads + NTHREADS; t++) {
         if (t->state == TS_NONE)
             break;
     }
     if (t == threads + NTHREADS) {
-        mutex_unlock(&sched_lock);
+        spin_unlock(&sched_lock);
         return NULL;
     }
 
     t->state = TS_INTERRUPTIBLE;
-    mutex_unlock(&sched_lock);
+    spin_unlock(&sched_lock);
 
     t->counter = 0;
     t->sleep = 0;
@@ -255,15 +255,15 @@ void sched_stop_thread()
 
 void sched_stop_other_threads()
 {
-    static mutex_t lock = 0;
+    static spinlock_t lock = 0;
     struct thread *t;
 
-    mutex_lock(&lock);
+    spin_lock(&lock);
 
     /* In case another thread is terminating the process at the same time and
      * already stopped us while we were waiting on the lock. */
     if (thread->signal & SIG_KILL_THREAD) {
-        mutex_unlock(&lock);
+        spin_unlock(&lock);
         sched_stop_thread();
     }
 
@@ -275,7 +275,7 @@ void sched_stop_other_threads()
         }
     }
 
-    mutex_unlock(&lock);
+    spin_unlock(&lock);
 
     while (proc->nthreads > 1)
         yield_thread();
@@ -328,7 +328,7 @@ int sched_waitpid(int pid, int *wstatus, int options)
         return -EINVAL;
 
     for (;;) {
-        mutex_lock(&sched_lock);
+        spin_lock(&sched_lock);
         for (p = procs; p < procs + NPROCS; p++) {
             if (p->state == PS_NONE || p->ppid != proc->pid)
                 continue;
@@ -342,7 +342,7 @@ int sched_waitpid(int pid, int *wstatus, int options)
                     goto done;
             }
         }
-        mutex_unlock(&sched_lock);
+        spin_unlock(&sched_lock);
 
         if (!found)
             return -ECHILD;
@@ -355,7 +355,7 @@ int sched_waitpid(int pid, int *wstatus, int options)
     }
 
 done:
-    mutex_unlock(&sched_lock);
+    spin_unlock(&sched_lock);
     if (wstatus)
         *wstatus = p->exit_status;
     pid = p->pid;

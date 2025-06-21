@@ -126,11 +126,11 @@ memcpy:
     pop esi
     ret
 
-; void mutex_lock(mutex_t *mutex)
-; Spinlock on a mutex. If the mutex is already locked, invoke the scheduler
-; on each loop to give other threads the chance to release it.
-global mutex_lock
-mutex_lock:
+; void spin_lock(spinlock_t *spinlock)
+; Try to lock a simple spinlock. If it's already locked, yield this thread on
+; each loop until another thread releases it.
+global spin_lock
+spin_lock:
     mov eax, [esp+4]
     mov cx, 1
 .loop:

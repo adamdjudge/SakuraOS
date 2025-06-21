@@ -17,7 +17,7 @@ struct inode *g_root_dir;
 
 /* Internal inode cache */
 static struct inode inodes[NUM_INODES];
-static mutex_t inodes_lock;
+static spinlock_t inodes_lock;
 
 int iget(struct inode **ip, struct superblock *s, unsigned int inum)
 {
@@ -27,11 +27,11 @@ int iget(struct inode **ip, struct superblock *s, unsigned int inum)
     if (inum == 0 || inum > s->ninodes)
         return -1; // Index out of range
 
-    mutex_lock(&inodes_lock);
+    spin_lock(&inodes_lock);
     for (i = inodes; i < inodes + NUM_INODES; i++) {
         if (i->dev == s->dev && i->inum == inum) {
             idup(i);
-            mutex_unlock(&inodes_lock);
+            spin_unlock(&inodes_lock);
             *ip = i;
             return 0;
         }
@@ -41,31 +41,31 @@ int iget(struct inode **ip, struct superblock *s, unsigned int inum)
             break;
     }
     if (i == inodes + NUM_INODES) {
-        mutex_unlock(&inodes_lock);
+        spin_unlock(&inodes_lock);
         return -ENFILE;
     }
 
-    mutex_lock(&i->lock);
+    spin_lock(&i->lock);
     i->dev = s->dev;
     i->inum = inum;
     i->count = 1;
     i->super = s;
     i->mount = NULL;
-    mutex_unlock(&inodes_lock);
+    spin_unlock(&inodes_lock);
 
     b = readblk(s->dev, 2 + s->imap_blocks + s->zmap_blocks
                           + (inum - 1) / INODES_PER_BLOCK);
     if (!b) {
         i->count = 0;
         printk("iget: failed to read inode block\n");
-        mutex_unlock(&i->lock);
+        spin_unlock(&i->lock);
         return -EIO;
     }
     memcpy(i, b->data + ((inum - 1) % INODES_PER_BLOCK) * INODE_SIZE,
            INODE_SIZE);
     relbuf(b);
 
-    mutex_unlock(&i->lock);
+    spin_unlock(&i->lock);
     *ip = i;
     return 0;
 }
@@ -97,9 +97,9 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
     unsigned int blk, blk_off, devblk, copylen, total = 0;
     dev_t dev;
 
-    mutex_lock(&i->lock);
+    spin_lock(&i->lock);
     if (offset >= i->size) {
-        mutex_unlock(&i->lock);
+        spin_unlock(&i->lock);
         return 0;
     } else if (offset + length >= i->size) {
         length = i->size - offset;
@@ -116,13 +116,13 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
             dev = i->zones[0];
             devblk = blk;
         } else {
-            mutex_unlock(&i->lock);
+            spin_unlock(&i->lock);
             return -ENOSYS;
         }
 
         b = readblk(dev, devblk);
         if (!b) {
-            mutex_unlock(&i->lock);
+            spin_unlock(&i->lock);
             return total > 0 ? total : -EIO; /* TODO: error from driver */
         }
         copylen = MIN(BLOCKSIZE - blk_off, MIN(length - total, BLOCKSIZE));
@@ -132,16 +132,16 @@ int iread(struct inode *i, void *buf, unsigned int offset, unsigned int length)
         total += copylen;
     }
 
-    mutex_unlock(&i->lock);
+    spin_unlock(&i->lock);
     return total;
 }
 
 int iwrite(struct inode *i, void *buf, unsigned int offset, unsigned int length)
 {
-    mutex_lock(&i->lock);
+    spin_lock(&i->lock);
     if (MODE_TYPE(i->mode) == IFBLK) {
         if (offset >= i->size) {
-            mutex_unlock(&i->lock);
+            spin_unlock(&i->lock);
             return 0;
         } else if (offset + length >= i->size) {
             length = i->size - offset;
@@ -149,7 +149,7 @@ int iwrite(struct inode *i, void *buf, unsigned int offset, unsigned int length)
     }
 
     /* TODO: write to other things */
-    mutex_unlock(&i->lock);
+    spin_unlock(&i->lock);
     return -ENOSYS;
 }
 

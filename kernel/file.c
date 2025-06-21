@@ -11,7 +11,7 @@
 #include <chrdev.h>
 
 static struct file files[NUM_FILES];
-static mutex_t files_lock;
+static spinlock_t files_lock;
 
 int open(char *path, unsigned int flags, unsigned int creat_mode)
 {
@@ -21,25 +21,25 @@ int open(char *path, unsigned int flags, unsigned int creat_mode)
     if ((flags & O_ACCMODE) == O_INVALID_ACCMODE)
         return -EINVAL;
 
-    mutex_lock(&files_lock);
+    spin_lock(&files_lock);
     for (f = files; f < files + NUM_FILES; f++) {
         if (f->count == 0) {
             f->count++;
             break;
         }
     }
-    mutex_unlock(&files_lock);
+    spin_unlock(&files_lock);
     if (f == files + NUM_FILES)
         return -ENFILE;
 
-    mutex_lock(&proc->files_lock);
+    spin_lock(&proc->files_lock);
     for (fd = 0; fd < OPEN_MAX; fd++) {
         if (proc->files[fd] == 0) {
             proc->files[fd] = f;
             break;
         }
     }
-    mutex_unlock(&proc->files_lock);
+    spin_unlock(&proc->files_lock);
     if (fd == OPEN_MAX) {
         f->count = 0;
         return EMFILE;
@@ -86,7 +86,7 @@ int dup(int fd)
         return -EBADF;
     f = proc->files[fd];
 
-    mutex_lock(&proc->files_lock);
+    spin_lock(&proc->files_lock);
     for (i = 0; i < OPEN_MAX; i++) {
         if (proc->files[i] == NULL) {
             proc->files[i] = f;
@@ -94,7 +94,7 @@ int dup(int fd)
             break;
         }
     }
-    mutex_unlock(&proc->files_lock);
+    spin_unlock(&proc->files_lock);
 
     return i == OPEN_MAX ? -EMFILE : i;
 }
@@ -123,7 +123,7 @@ int read(int fd, char *buf, unsigned int length)
              MODE_TYPE(f->inode->mode) != IFSOCK;
 
     if (setpos)
-        mutex_lock(&f->lock);
+        spin_lock(&f->lock);
 
     switch(MODE_TYPE(f->inode->mode)) {
     case IFCHR:
@@ -143,7 +143,7 @@ int read(int fd, char *buf, unsigned int length)
 
 done:
     if (setpos)
-        mutex_unlock(&f->lock);
+        spin_unlock(&f->lock);
     return ret;
 }
 
@@ -171,7 +171,7 @@ int write(int fd, char *buf, unsigned int length)
              MODE_TYPE(f->inode->mode) != IFSOCK;
 
     if (setpos) {
-        mutex_lock(&f->lock);
+        spin_lock(&f->lock);
         if (f->flags & O_APPEND)
             f->pos = f->inode->size;
     }
@@ -194,6 +194,6 @@ int write(int fd, char *buf, unsigned int length)
 
 done:
     if (setpos)
-        mutex_unlock(&f->lock);
+        spin_unlock(&f->lock);
     return ret;
 }

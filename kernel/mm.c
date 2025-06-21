@@ -31,12 +31,12 @@ static uint32_t *pdir = (uint32_t *)0x401000;
 static uint32_t *pagestack = (uint32_t *)0x800000;
 static unsigned int ps_size = 0;
 static unsigned int stackp = 0;
-static mutex_t ps_lock;
+static spinlock_t ps_lock;
 
 /* Page reference counts for copy-on-write */
 static uint16_t *pagecount;
 static unsigned int pc_size;
-static mutex_t pc_lock;
+static spinlock_t pc_lock;
 
 static unsigned int npages;
 static uint32_t kvaddr = 0xc00000;
@@ -47,22 +47,22 @@ static uint32_t pop_page()
 {
     uint32_t page;
 
-    mutex_lock(&ps_lock);
+    spin_lock(&ps_lock);
     page = stackp > 0 ? pagestack[--stackp] : 0;
     if (page)
         npages++;
-    mutex_unlock(&ps_lock);
+    spin_unlock(&ps_lock);
     return page;
 }
 
 static void push_page(uint32_t addr)
 {
-    mutex_lock(&ps_lock);
+    spin_lock(&ps_lock);
     if (stackp < ps_size / sizeof(uint32_t)) {
         pagestack[stackp++] = addr;
         npages--;
     }
-    mutex_unlock(&ps_lock);
+    spin_unlock(&ps_lock);
 }
 
 void mm_init()
@@ -225,7 +225,7 @@ bool mm_add_mapping(uint32_t base, uint32_t size, uint32_t flags,
 {
     struct vmap *vm;
 
-    mutex_lock(&proc->mm_lock);
+    spin_lock(&proc->mm_lock);
 
     for (vm = proc->vmaps; vm < proc->vmaps + NVMAPS; vm++) {
         if (vm->size == 0) {
@@ -245,7 +245,7 @@ bool mm_add_mapping(uint32_t base, uint32_t size, uint32_t flags,
         }
     }
 
-    mutex_unlock(&proc->mm_lock);
+    spin_unlock(&proc->mm_lock);
     return vm != proc->vmaps + NVMAPS;
 }
 
@@ -259,13 +259,13 @@ void mm_free_proc_memory()
             if (!check_page(addr))
                 continue;
 
-            mutex_lock(&pc_lock);
+            spin_lock(&pc_lock);
             if (PAGECOUNT(addr) == 0) {
-                mutex_unlock(&pc_lock);
+                spin_unlock(&pc_lock);
                 free_page(addr);
             } else {
                 PAGECOUNT(addr)--;
-                mutex_unlock(&pc_lock);
+                spin_unlock(&pc_lock);
             }
         }
 
@@ -287,7 +287,7 @@ bool mm_fork_memory(uint32_t *new_pdir)
     struct vmap *vm;
     uint32_t addr, i, flags;
 
-    mutex_lock(&proc->mm_lock);
+    spin_lock(&proc->mm_lock);
 
     /* Set each private writable page to copy-on-write and increment the
      * physical page reference count of all present pages. */
@@ -309,7 +309,7 @@ bool mm_fork_memory(uint32_t *new_pdir)
     for (i = 256; i < 1024; i++) {
         if (pdir[i] & PAGE_PRESENT) {
             if (!alloc_page(0xfffff000, PAGE_WRITABLE)) {
-                mutex_unlock(&proc->mm_lock);
+                spin_unlock(&proc->mm_lock);
                 panic("mm_fork_memory: out of memory"); // FIXME: un-cow pages
                 return false;
             }
@@ -321,7 +321,7 @@ bool mm_fork_memory(uint32_t *new_pdir)
     }
 
     flush_tlb();
-    mutex_unlock(&proc->mm_lock);
+    spin_unlock(&proc->mm_lock);
     return true;
 }
 
@@ -339,15 +339,15 @@ static void pf_error(struct exception *e)
 
 static void pf_copy_on_write(uint32_t page)
 {
-    mutex_lock(&pc_lock);
+    spin_lock(&pc_lock);
 
     if (PAGECOUNT(page) == 0) {
-        mutex_unlock(&pc_lock);
+        spin_unlock(&pc_lock);
         ptabs[TABENT(page)] &= ~PAGE_COPYONWRITE;
         ptabs[TABENT(page)] |= PAGE_WRITABLE;
     } else {
         PAGECOUNT(page)--;
-        mutex_unlock(&pc_lock);
+        spin_unlock(&pc_lock);
 
         /* Allocate new page temporarily mapped to the top of VM, copy contents
          * to it, then remap over the original page as writable. */
@@ -409,7 +409,7 @@ void handle_page_fault(struct exception *e)
     printk("page fault: pid %d: %s 0x%x\n", proc->pid,
            e->err & PF_WRITE ? "write" : "read", e->cr2);
 
-    mutex_lock(&proc->mm_lock);
+    spin_lock(&proc->mm_lock);
     page = PAGE_BASE(e->cr2);
     for (vm = proc->vmaps; vm < proc->vmaps + NVMAPS; vm++) {
         if (page >= vm->base && page < vm->base + vm->size)
@@ -417,7 +417,7 @@ void handle_page_fault(struct exception *e)
     }
     if (vm == proc->vmaps + NVMAPS) {
         pf_error(e);
-        mutex_unlock(&proc->mm_lock);
+        spin_unlock(&proc->mm_lock);
         return;
     }
 
@@ -430,5 +430,5 @@ void handle_page_fault(struct exception *e)
     else
         pf_error(e);
 
-    mutex_unlock(&proc->mm_lock);
+    spin_unlock(&proc->mm_lock);
 }

@@ -12,7 +12,7 @@ static int pos;
 
 static char *textmem = (char *) 0xb8000;
 
-static mutex_t console_lock;
+static spinlock_t console_lock;
 
 static void update_cursor()
 {
@@ -61,7 +61,7 @@ static void linefeed()
 
 void console_putc(char c)
 {
-    mutex_lock(&console_lock);
+    spin_lock(&console_lock);
 
     switch (c) {
     case '\n':
@@ -90,5 +90,5 @@ void console_putc(char c)
     }
 
     update_cursor();
-    mutex_unlock(&console_lock);
+    spin_unlock(&console_lock);
 }

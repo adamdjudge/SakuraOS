@@ -21,10 +21,10 @@ void printk(const char *fmt, ...);
 void memset(void *s, char c, unsigned int n);
 void memcpy(void *dest, void *src, unsigned int n);
 
-typedef int mutex_t;
+typedef int spinlock_t;
 
-void mutex_lock(mutex_t *mutex);
-#define mutex_unlock(mutex) (*mutex = 0)
+void spin_lock(spinlock_t *spinlock);
+#define spin_unlock(spinlock) (*spinlock = 0)
 
 void panic(const char *msg);
 

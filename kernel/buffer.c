@@ -11,7 +11,7 @@
 #include <sched.h>
 
 static struct buffer buffers[NUM_BUFFERS];
-static mutex_t buffers_lock;
+static spinlock_t buffers_lock;
 
 static void lockbuf(struct buffer *b)
 {
@@ -25,13 +25,13 @@ struct buffer *getbuf(dev_t dev, int block)
     struct buffer *b, *buf;
 
 repeat:
-    mutex_lock(&buffers_lock);
+    spin_lock(&buffers_lock);
 
     buf = buffers;
     for (b = buffers + 1; b < buffers + NUM_BUFFERS; b++) {
         if (b->dev == dev && b->block == block) {
             lockbuf(b);
-            mutex_unlock(&buffers_lock);
+            spin_unlock(&buffers_lock);
             b->time = jiffies();
             return b;
         }
@@ -41,13 +41,13 @@ repeat:
     }
     if (buf->flags & BUF_LOCK) {
         // All buffers are locked, so wait until one is free
-        mutex_unlock(&buffers_lock);
+        spin_unlock(&buffers_lock);
         yield_thread();
         goto repeat;
     }
 
     buf->flags |= BUF_LOCK;
-    mutex_unlock(&buffers_lock);
+    spin_unlock(&buffers_lock);
 
     if (buf->flags & BUF_DIRTY) {
         block_rw(WRITE, buf);
