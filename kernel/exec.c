@@ -159,8 +159,6 @@ int sys_execve(struct exception *e)
 
     if ((ret = verify_elf(exe, &ehdr)) < 0)
         goto error;
-    printk("execve (%d): %s\n", proc->pid, pathname);
-    sched_stop_other_threads();
 
     spin_lock(&buf_lock);
     if (!copy_to_buf(argv, args_buf, &args_len, &args_count)
@@ -170,6 +168,8 @@ int sys_execve(struct exception *e)
         goto error;
     }
 
+    printk("execve (%d): %s\n", proc->pid, pathname);
+    sched_stop_other_threads();
     mm_free_proc_memory();
     if (proc->exe)
         iput(proc->exe);
