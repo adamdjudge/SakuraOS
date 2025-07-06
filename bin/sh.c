@@ -2,10 +2,27 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-int main()
+int main(char **argv, char **envp)
 {
     int ret;
     char buffer[64];
+    char *s;
+
+    write(STDOUT_FILENO, "argv:", 5);
+    while (*argv) {
+        write(STDOUT_FILENO, " ", 1);
+        s = *argv++;
+        while (*s)
+            write(STDOUT_FILENO, s++, 1);
+    }
+    write(STDOUT_FILENO, "\nenvp:", 6);
+    while (*envp) {
+        write(STDOUT_FILENO, " ", 1);
+        s = *envp++;
+        while (*s)
+            write(STDOUT_FILENO, s++, 1);
+    }
+    write(STDOUT_FILENO, "\n", 1);
 
     for (;;) {
         write(STDOUT_FILENO, "# ", 2);

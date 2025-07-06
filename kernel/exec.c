@@ -11,6 +11,12 @@
 #include <fs.h>
 #include <signal.h>
 
+#define ARG_MAX 1024
+
+static char args_buf[ARG_MAX];
+static char env_buf[ARG_MAX];
+static spinlock_t buf_lock;
+
 static int verify_elf(struct inode *exe, struct elf32_ehdr *ehdr)
 {
     int ret;
@@ -24,27 +30,22 @@ static int verify_elf(struct inode *exe, struct elf32_ehdr *ehdr)
     else if (ret < sizeof(*ehdr))
         return -EIO;
 
-    if (*((uint32_t *)ehdr->e_ident) != ELFMAG_WORD) {
+    if (*((uint32_t *)ehdr->e_ident) != ELFMAG_WORD)
         printk("verify_elf: not an ELF file\n");
-        return -ENOEXEC;
-    } else if (ehdr->e_ident[EI_CLASS] != ELFCLASS32) {
+    else if (ehdr->e_ident[EI_CLASS] != ELFCLASS32)
         printk("verify_elf: e_ident[EI_CLASS] invalid for i386\n");
-        return -ENOEXEC;
-    } else if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
+    else if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB)
         printk("verify_elf: e_ident[EI_DATA] invalid for i386\n");
-        return -ENOEXEC;
-    } else if (ehdr->e_type != ET_EXEC) {
+    else if (ehdr->e_type != ET_EXEC)
         printk("verify_elf: not an executable\n");
-        return -ENOEXEC;
-    } else if (ehdr->e_machine != EM_386) {
+    else if (ehdr->e_machine != EM_386)
         printk("verify_elf: e_machine is not i386\n");
-        return -ENOEXEC;
-    } else if (ehdr->e_phnum == 0) {
+    else if (ehdr->e_phnum == 0)
         printk("verify_elf: file contains no program headers\n");
-        return -ENOEXEC;
-    }
+    else
+        return 0;
 
-    return 0;
+    return -ENOEXEC;
 }
 
 static int load_elf(struct inode *exe, struct elf32_ehdr *ehdr)
@@ -81,41 +82,105 @@ static int load_elf(struct inode *exe, struct elf32_ehdr *ehdr)
     return 0;
 }
 
+static bool copy_to_buf(char **arr, char *buf, int *len, int *count)
+{
+    char *s;
+
+    *len = 0;
+    *count = 0;
+    if (!arr)
+        return true;
+
+    while (*arr) {
+        *count = *count + 1;
+        s = *arr++;
+        while (*s) {
+            if ((*len)++ == ARG_MAX)
+                return false;
+            *buf++ = *s++;
+        }
+        if ((*len)++ == ARG_MAX)
+            return false;
+        *buf++ = '\0';
+    }
+
+    return true;
+}
+
+static uint32_t push_array(uint32_t sp, char *buf, int len, int count)
+{
+    char *s, **arr;
+
+    sp -= len;
+    s = (char *)sp;
+    memcpy(s, buf, len);
+
+    sp -= (count+1) * sizeof(char *);
+    arr = (char **)sp;
+    while (count-- > 0) {
+        *arr++ = s;
+        while (*s)
+            s++;
+        s++;
+    }
+
+    return sp;
+}
+
+// TODO: make a centralized perror() instead
+static char *errmsg(int errno)
+{
+    switch (errno) {
+    case -ENOEXEC: return "bad file";
+    case -EIO: return "I/O error";
+    case -EACCESS: return "permission denied";
+    case -E2BIG: return "argument/environment too big";
+    }
+    return "other";
+}
+
 int sys_execve(struct exception *e)
 {
-    int ret, i;
-    struct inode *exe;
+    int ret, i, args_count, args_len, env_count, env_len;
+    struct inode *exe = NULL;
     struct elf32_ehdr ehdr;
-    char *filename = (char *)e->ebx;
+    char *pathname = (char *)e->ebx;
+    char **argv = (char **)e->ecx;
+    char **envp = (char **)e->edx;
+    uint32_t new_argv, new_envp, *sp;
 
-    ret = ilookup(&exe, filename);
+    ret = ilookup(&exe, pathname);
     if (ret) {
-        printk("execve: error: could not open '%s'\n", filename);
+        printk("execve (%d): could not open '%s'\n", proc->pid, pathname);
         return ret;
     }
 
     /* TODO: permission check */
 
-    ret = verify_elf(exe, &ehdr);
-    if (ret == -ENOEXEC)
-        goto bad_file;
-    else if (ret < 0)
-        goto read_error;
-
-    printk("execve: pid %d: %s\n", proc->pid, filename);
-
+    if ((ret = verify_elf(exe, &ehdr)) < 0)
+        goto error;
+    printk("execve (%d): %s\n", proc->pid, pathname);
     sched_stop_other_threads();
+
+    spin_lock(&buf_lock);
+    if (!copy_to_buf(argv, args_buf, &args_len, &args_count)
+        || !copy_to_buf(envp, env_buf, &env_len, &env_count))
+    {
+        ret = -E2BIG;
+        goto error;
+    }
+
     mm_free_proc_memory();
     if (proc->exe)
         iput(proc->exe);
 
-    ret = load_elf(exe, &ehdr);
-    if (ret == -ENOEXEC)
-        goto bad_file;
-    else if (ret < 0)
-        goto read_error;
+    if ((ret = load_elf(exe, &ehdr)) < 0)
+        goto error;
     mm_add_mapping(0xffffe000, PAGE_SIZE, VMAP_WRITABLE | VMAP_STACK,
                    0, 0, NULL);
+    new_argv = push_array(0xfffff000, args_buf, args_len, args_count);
+    new_envp = push_array(new_argv, env_buf, env_len, env_count);
+    spin_unlock(&buf_lock);
 
     proc->exe = exe;
     proc->rtime = 0;
@@ -133,6 +198,11 @@ int sys_execve(struct exception *e)
             close(i);
     }
 
+    sp = (uint32_t *)new_envp;
+    *(--sp) = new_envp;
+    *(--sp) = new_argv;
+    e->esp = (uint32_t)sp;
+
     e->cs = 0x1B;
     e->ds = 0x23;
     e->es = 0x23;
@@ -146,15 +216,14 @@ int sys_execve(struct exception *e)
     e->edi = 0;
     e->esi = 0;
     e->ebp = 0;
-    e->esp = 0xfffff000;
     e->eflags = (1 << 9);
     e->eip = ehdr.e_entry;
     return 0;
 
-bad_file:
-    printk("execve: error: bad file '%s'\n", filename);
-    return ret;
-read_error:
-    printk("execve: error: failed to read '%s'\n", filename);
+error:
+    printk("execve (%d): %s\n", proc->pid, errmsg(ret));
+    if (exe)
+        iput(exe);
+    spin_unlock(&buf_lock);
     return ret;
 }
