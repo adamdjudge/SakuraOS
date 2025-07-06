@@ -87,30 +87,18 @@ static uint8_t read_data()
 {
     while ((in_byte(PS2_CMD) & PS2_STATUS_OUT) == 0) {}
     return in_byte(PS2_DATA);
-
-    int delay = 10000;
-    while (delay > 0)
-        delay--;
 }
 
 static void write_command(uint8_t cmd)
 {
     while (in_byte(PS2_CMD) & PS2_STATUS_IN) {}
     out_byte_wait(PS2_CMD, cmd);
-
-    int delay = 10000;
-    while (delay > 0)
-        delay--;
 }
 
 static void write_data(uint8_t data)
 {
     while (in_byte(PS2_CMD) & PS2_STATUS_IN) {}
     out_byte_wait(PS2_DATA, data);
-
-    int delay = 10000;
-    while (delay > 0)
-        delay--;
 }
 
 void ps2_init()
