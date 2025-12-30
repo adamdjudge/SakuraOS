@@ -6,7 +6,8 @@
 #ifndef BOOTLOADER_H
 #define BOOTLOADER_H
 
-#include "stdint.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 #define NULL (void*) 0
 
@@ -15,6 +16,10 @@
 #define MAX(a, b) (a > b ? a : b)
 
 uint8_t in_byte(uint16_t port);
+uint8_t in_byte_wait(uint16_t port);
 void out_byte(uint16_t port, uint8_t val);
+void out_byte_wait(uint16_t port, uint8_t val);
+
+void delay(unsigned int ms);
 
 #endif

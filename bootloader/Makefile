@@ -1,10 +1,10 @@
 CC = x86_64-linux-gnu-gcc
-CFLAGS = -c -m32 -ffreestanding -fno-pie -std=c99 -Werror -Wall
+CFLAGS = -c -m32 -ffreestanding -fno-pie -std=c99 -Werror -Wall -mgeneral-regs-only
 AS = nasm
 LD = x86_64-linux-gnu-ld
 OC = x86_64-linux-gnu-objcopy
 
-OBJ = start.o memdetect.o main.o console.o string.o
+OBJ = start.o memdetect.o main.o console.o string.o interrupt.o floppy.o
 
 disk: bootsect.s template.img stage2
 	$(AS) -f bin -o boot.img $<

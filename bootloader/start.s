@@ -90,7 +90,4 @@ gdt_start:
     dq 0x0000_0000_0000_0000  ; Null segment
     dq 0x00CF_9B00_0000_FFFF  ; Kernel code
     dq 0x00CF_9300_0000_FFFF  ; Kernel data
-    dq 0x00CF_FB00_0000_FFFF  ; User code
-    dq 0x00CF_F300_0000_FFFF  ; User data
-    dq 0x0000_8900_0000_0068  ; Task state segment
 gdt_end:
