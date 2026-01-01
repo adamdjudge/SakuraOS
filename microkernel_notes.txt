@@ -5,7 +5,6 @@ Boot Process:
 - Bootloader loads kernel as well as startup services as modules
 - Modules are loaded into sequential physical memory after kernel
 - Bootloader passes module parameters array to kernel:
-  - Process name
   - Physical base address
   - Virtual address and size of each segment
   - Execution start address
@@ -13,40 +12,133 @@ Boot Process:
 - Kernel and modules are all individual ELF executables
 - Kernel creates process and maps segments for each startup service
 
-Message Passing:
-- Fully synchronous: sender pauses until target receives message
-- Only two syscalls: Call and ReplyRecvAny
-- Target/source pid in eax, other arguments in ebx, ecx, edx, esi, edi
-- For more data, protocols can define a register as a pointer
-- Call:
-  - int 0x40
+Virtual Memory Layout:
+- 0x00000000 - 0x07ffffff (128M) identity-mapped to physical memory
+- 0x08000000 - 0x0fffffff (128M) lazily paged TCB array:
+  - 128K entries, 1K each
+- In unprivelidged address spaces:
+  - 0x10000000 - 0xffffffff available
+- In privelidged address spaces:
+  - 0x10000000 - 0xffffefff available
+  - 0xfffff000 - 0xffffffff read-only kernel info page:
+    - Kernel version and compile time
+    - System uptime in seconds:microseconds
+    - Memory size, CPU info, etc.
+    - Number of privelidged and unprivelidged tasks
+    - Kernel, privelidged, and unprivelidged memory use
+    - etc...
+
+Tasks:
+- Can have unique or shared virtual memory space
+- Two privelidge levels: only privelidged tasks can make direct syscalls
+- Assigned unique pid in [1, 0x7ffeffff]
+- In any syscall, target pid -1 means self
+- TCB structure:
+  - Lazily mapped array of 128K TCBs, 1K each
+  - TCB contains task attributes and kernel stack
+  - Bitwise AND esp with 0xfffffc00 to get current TCB base
+  - Bottom 17 bits of pid directly index TCB entry for O(1) lookup
+  - Upper 14 bits of pid are "version" of TCB entry
+  - Running tasks form a linked list for O(1) scheduling
+  - (This structure is stronly inspired by the L4 microkernel)
+- Each task has optional handler pids for:
+  - CPU exceptions
+  - Page faults
+  - Task death
+- Task flags:
+  - Privelidge level
+  - Auto-restart on death
+
+System Calls:
+- Only available to privelidged tasks
+- Small number, so selected by int number
+- On error, eax set to negative error number
+- Call (int 0x40):
   - Atomically sends message to target pid and waits for reply from same pid
   - Target pid in eax, same on return
-- ReplyRecvAny:
-  - int 0x41
-  - Atomically sends message to target pid and waits for next message from any pid
+- ReplyRecvAny (int 0x41):
+  - Atomically sends message to target pid and waits for next message from any
   - Target pid in eax, on return eax is source pid of next received message
-  - Intended for servers to be based on doing this in a loop
-- Servers can set their pid to service IDs defined by convention (like TCP ports)
-- pid 0 is the kernel, and is used to Call kernel functions (syscalls)
-- pids 1 - 0x3fffffff are assigned to new processes on creation
-- pids 0x40000000 - 0x7ffeffff can be defined as service IDs
-- pids 0x7fff0000 - 0x7fffffff reserved for kernel event messages
-- No negative pids: syscalls can return negative error codes in eax
+  - Target pid 0 is discard
+  - Server tasks do this in a loop
+- GetTaskAttrs (int 0x42):
+  - Target pid in eax, buffer pointer in ebx (must be dword-aligned)
+- SetTaskAttrs (int 0x43):
+  - Target pid in eax, buffer pointer in ebx (must be dword-aligned)
+- GetRegisters (int 0x44):
+  - Target pid in eax, buffer pointer in ebx (must be dword-aligned)
+- SetRegisters (int 0x45):
+  - Target pid in eax, buffer pointer in ebx (must be dword-aligned)
+- GetTaskState (int 0x46):
+  - Target pid in eax
+  - On return eax is state (running or paused)
+- SetTaskState (int 0x47):
+  - Target pid in eax, state in ebx (run, pause, kill)
+- MapMemory (int 0x48):
+  - Target pid in eax
+  - ebx is virtual address, bottom bits are mode (map/unmap, set/clear writable)
+  - ecx is page count (zero-based)
+  - (if map) edx is physical address, or 0xffffffff for anonymous
+  - Skips unmapped pages in specified range
+- GetPhysAddr (int 0x49):
+  - Target pid in eax, virtual address in ebx
+  - On return eax is return code, ebx is physical address
+- Copy (int 0x4a):
+  - Source pid in eax, source virtual address in ebx
+  - Destination pid in ecx, destination virtual address in edx
+  - Number of bytes in esi
+- Spawn (int 0x4b):
+  - pid of address space to use in eax, or 0 to create new address space
+  - ebx is pointer to task creation parameters
+- SetTimeouts (int 0x4c):
+  - Send timeout seconds:microseconds in eax:ebx
+  - Receive timeout seconds:microseconds in ecx:edx
+  - 0:0 for no timeout
+- SetTimer (int 0x4d):
+  - Timer length seconds:microseconds in eax:ebx
+- HandleInterrupt (int 0x4e):
+  - IRQ number in eax
+- Additional notes:
+  - Message passing is fully synchronous. When a task sends a message, it is
+    paused until the message is received.
+  - The only data directly passed in messages is the ebx, ecx, edx, esi, and edi
+    registers. Protocols can define that any of them are buffer pointers, which
+    the receiving server can use Copy to access.
+  - Call and ReplyRecvAny are separate, rather than using one call with two pids,
+    to conserve an additional register for message contents.
+  - The task attribute and task register calls are separate categories because,
+    on a multi-core system, getting the registers of another task is more difficult
+    as the task might be currently running on another core.
+  - The task state calls are separate because they don't require a buffer.
+  - Timers need to be a kernel feature both to ensure accuracy and because only
+    the kernel can handle PIT interrupts.
+  - Internally timers are stored in a linked list that is always sorted so that
+    the nearest to expiration timer is first, making the ISR timer check O(1).
+  - On i386 the kernel only has millisecond timing resolution, but timers use
+    microsecond resolution for forwards compatibility with faster hardware.
 
 Kernel Events:
 - Messages generated by the kernel with source pid in 0x7fff0000 - 0x7fffffff
-- Interrupt Events:
-  - Processes can register as the handler for interrupts
-  - Only one process can be the handler for any interrupt at a time
-- Process Events:
-  - Things like process death and CPU exceptions
-  - Each TCB has a table of pids set to handle these events
+- General Events:
+  - pid 0x7fff0000: timer expiration
+  - pid 0x7fff0001: task death:
+    - ebx is pid
+    - ecx is reason code
+  - pid 0x7fff0002: page fault:
+    - ebx is pid
+    - ecx is faulting virtual address
+    - edx is reason code
+- Exception Events:
+  - pid 0x7fff01xx where xx is the exception number
   - Message sent to handler contains pid, eip, and possibly other relevant info
   - Handled exceptions pause the offending process until handler replies with status (ok or kill)
-  - Kernel has a default behavior for events if no handler is set (usually kill)
-  - Default page fault action:
-    - Kill process if it accesses kernel memory (below 1G, also catches null deref)
-    - Kill process if it writes to a read-only page
-    - Otherwise allocate a new blank page (i.e. bss or stack)
-    - Just enough for startup services, including the real memory manager
+- Interrupt Events:
+  - pid 0x7fff02xx where xx is the IRQ number
+  - Tasks can register as the handler for interrupts
+  - Only one task can be the handler for any interrupt at a time
+- Kernel has default behavior for task events if no handler is set (usually kill)
+- Default page fault action:
+  - Kill task if it accesses kernel memory (below 1G, also catches null deref)
+  - Kill task if it writes to a read-only page
+  - Otherwise allocate a new blank page (i.e. bss or stack)
+  - Just enough for startup services, including the real memory manager
