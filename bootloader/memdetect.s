@@ -1,6 +1,6 @@
 ; ==============================================================================
 ; The SakuraOS Bootloader
-; Copyright 2025 Adam Judge
+; Copyright 2026 Adam Judge
 ; ==============================================================================
 
 ; Memory range descriptor returned by each 0xE820 BIOS call
