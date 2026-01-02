@@ -7,10 +7,20 @@
 #include "string.h"
 #include "console.h"
 
-void memcpy(char *dest, char *src, unsigned int len)
+void memcpy(void *dest, void *src, unsigned int len)
 {
+    char *d = dest, *s = src;
     while (len--)
-        *dest++ = *src++;
+        *d++ = *s++;
+}
+
+bool strcmp(char *a, char *b)
+{
+    while (*a && *b) {
+        if (*a++ != *b++)
+            return false;
+    }
+    return *a == *b;
 }
 
 static void printd(char **p, unsigned int v)

@@ -24,19 +24,13 @@ void console_init()
 {
     int i;
 
-    color = BG_BLACK | TEXT_WHITE;
+    color = BG_BLACK | TEXT_LIGHTGRAY;
     pos = 0;
 
     for (i = 0; i < SCREEN_NCHARS; i++) {
         textmem[2*i] = '\0';
         textmem[2*i+1] = BG_BLACK | TEXT_WHITE;
     }
-
-    /* Set cursor to block. */
-    out_byte(0x3D4, 0x0A);                         // Index cursor start register
-    out_byte(0x3D5, (in_byte(0x3D5) & 0xC0));      // Start scanline = 0
-    out_byte(0x3D4, 0x0B);                         // Index cursor end register
-    out_byte(0x3D5, (in_byte(0x3D5) & 0xE0) | 15); // End scanline = 15
 
     update_cursor();
 }

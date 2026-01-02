@@ -219,7 +219,7 @@ bool floppy_read_block(void *buf, uint8_t minor, unsigned int lba)
         return false;
     if (lba + 2 >= floppy_geom.cyls * floppy_geom.heads * floppy_geom.sects)
         return false;
-    lba_to_chs(&floppy_geom, lba, &chs);
+    lba_to_chs(&floppy_geom, 2*lba, &chs);
 
     set_motor(minor, true);
     ret = rw_cmd(minor, &chs, false);

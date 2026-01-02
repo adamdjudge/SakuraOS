@@ -7,6 +7,7 @@
 #include "string.h"
 #include "console.h"
 #include "floppy.h"
+#include "fs.h"
 
 struct memrange {
     uint32_t base;
@@ -35,16 +36,26 @@ void main()
     
     interrupt_init();
     floppy_init();
-
-    char buffer[1024];
-    floppy_read_block(buffer, 0, 0);
-    for (int i = 0; i < 512; i++)
-        console_putc(buffer[i]);
-
-    for (;;) {
-        delay(1000);
-        printf("timer done\n");
+    if (!fs_init()) {
+        printf("Boot failed: could not initialize filesystem\n");
+        return;
     }
+
+    struct inode test;
+    if (!get_bootdir_inode(&test, "test.txt")) {
+        printf("failed to load test.txt inode\n");
+        return;
+    }
+
+    static char buffer[4096];
+    if (!fileread(&test, buffer, 0, test.size)) {
+        printf("failed to read file\n");
+        return;
+    }
+    
+    for (int i = 0; buffer[i]; i++)
+        console_putc(buffer[i]);
+    printf("\nDone reading file: %d bytes\n", test.size);
 }
 
 uint8_t in_byte(uint16_t port)

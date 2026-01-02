@@ -4,12 +4,16 @@ AS = nasm
 LD = x86_64-linux-gnu-ld
 OC = x86_64-linux-gnu-objcopy
 
-OBJ = start.o memdetect.o main.o console.o string.o interrupt.o floppy.o
+OBJ = start.o memdetect.o main.o console.o string.o interrupt.o floppy.o fs.o
 
 disk: bootsect.s template.img stage2
 	$(AS) -f bin -o boot.img $<
 	tail -c +513 template.img >> boot.img
-	sudo mount boot.img /mnt && sudo cp stage2 /mnt && sudo umount /mnt
+	sudo mount boot.img /mnt
+	sudo cp stage2 /mnt/.stage2
+	sudo mkdir /mnt/boot
+	sudo cp ../test.txt /mnt/boot
+	sudo umount /mnt
 
 stage2: link.x $(OBJ)
 	$(LD) -T $< -o stage2.elf $(OBJ)

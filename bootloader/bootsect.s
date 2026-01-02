@@ -243,7 +243,7 @@ reboot:
 ; STRINGS AND VARIABLES
 ; ==============================================================================
 
-kernel_name        db "stage2", 0
+kernel_name        db ".stage2", 0
 disk_err           db "Disk error.", 0xD, 0xA, 0
 not_found          db "Stage 2 not found.", 0xD, 0xA, 0
 
