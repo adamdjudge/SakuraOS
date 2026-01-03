@@ -13,6 +13,7 @@ disk: bootsect.s template.img stage2
 	sudo mount boot.img /mnt
 	sudo cp stage2 /mnt/.bootloader
 	sudo mkdir /mnt/boot
+	sudo cp ../microkernel/kernel /mnt/boot
 	sudo umount /mnt
 
 stage2: link.x $(OBJ)
@@ -26,7 +27,7 @@ stage2: link.x $(OBJ)
 	$(AS) -f elf32 -o $@ $<
 
 run: disk
-	qemu-system-i386 -fda boot.img
+	qemu-system-i386 -fda boot.img -serial stdio
 
 clean:
 	rm -f boot.img stage2 stage2.elf *.o
