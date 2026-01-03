@@ -8,10 +8,10 @@
 #include "string.h"
 #include "floppy.h"
 
-char tmpblk[BLOCKSIZE];
-unsigned short curblk;
-unsigned short inodeblk;
-struct dentry bootdir_dentries[DENTRIES_PER_BLOCK];
+static char tmpblk[BLOCKSIZE];
+static unsigned short curblk;
+static unsigned short inodeblk;
+static struct dentry bootdir_dentries[DENTRIES_PER_BLOCK];
 
 /* Loads the "/boot" directory contents from disk. As a side effect, inodeblk
  * is set to the first block of the inode array. */

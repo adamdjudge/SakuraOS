@@ -65,7 +65,11 @@ enter_protected_mode:
     mov fs, ax
     mov gs, ax
     mov esp, __loram_top
+
     call main
+    cmp eax, 0
+    je .halt
+    jmp eax
 .halt:
     hlt
     jmp .halt

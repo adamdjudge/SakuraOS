@@ -20,8 +20,9 @@ struct memrange {
 extern struct memrange memtab[];
 
 extern void interrupt_init();
+extern uint32_t load_kernel(char *name);
 
-void main()
+uint32_t main()
 {
     console_init();
     printf("=============================");
@@ -38,24 +39,10 @@ void main()
     floppy_init();
     if (!fs_init()) {
         printf("Boot failed: could not initialize filesystem\n");
-        return;
+        return 0;
     }
 
-    struct inode test;
-    if (!get_bootdir_inode(&test, "test.txt")) {
-        printf("failed to load test.txt inode\n");
-        return;
-    }
-
-    static char buffer[4096];
-    if (!fileread(&test, buffer, 0, test.size)) {
-        printf("failed to read file\n");
-        return;
-    }
-    
-    for (int i = 0; buffer[i]; i++)
-        console_putc(buffer[i]);
-    printf("\nDone reading file: %d bytes\n", test.size);
+    return load_kernel("kernel");
 }
 
 uint8_t in_byte(uint16_t port)
