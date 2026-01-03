@@ -3,7 +3,7 @@ CFLAGS = -c -m32 -ffreestanding -fno-pie -std=c99 -Werror -Wall
 AS = nasm
 LD = x86_64-linux-gnu-ld
 
-OBJ = start.o main.o io.o debug.o
+OBJ = start.o idt.o main.o io.o debug.o exception.o
 
 kernel: link.x $(OBJ)
 	$(LD) -T $< -o kernel $(OBJ)

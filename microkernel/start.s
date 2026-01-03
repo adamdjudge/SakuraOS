@@ -92,7 +92,7 @@ _start:
     mov [cpuid_base_freq], ax
 
     ; Set up the IDT and call kernel main function.
-    ;call setup_idt
+    call setup_idt
     call kmain
 
     ; After initialization, this thread becomes the idle thread.
