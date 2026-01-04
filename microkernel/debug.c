@@ -22,7 +22,7 @@
 #define UART_MSR         6
 #define UART_SCRATCH     7
 
-void init_debug()
+void debug_init()
 {
     out_byte_wait(BASE_COM1 + UART_IEN, 0x00);        /* Disable interrupts */
     out_byte_wait(BASE_COM1 + UART_LCR, 0x80);        /* Set DLAB */

@@ -20,7 +20,6 @@ uint8_t in_byte_wait(uint16_t port);
 void out_byte(uint16_t port, uint8_t val);
 void out_byte_wait(uint16_t port, uint8_t val);
 
-void init_debug();
 void __debug(const char *file, int line, const char *fmt, ...);
 #define debug(...) __debug(__FILE__, __LINE__, __VA_ARGS__)
 

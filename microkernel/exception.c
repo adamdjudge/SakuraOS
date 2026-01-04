@@ -8,6 +8,5 @@
 
 void handle_exception(struct exception e)
 {
-    if (e.eno == ENO_IRQ0)
-        debug("got timer interrupt!");
+    
 }
