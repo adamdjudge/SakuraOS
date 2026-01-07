@@ -9,7 +9,7 @@
 #include "floppy.h"
 #include "fs.h"
 
-struct memrange {
+struct bios_memrange {
     uint32_t base;
     uint32_t _resvd1;
     uint32_t size;
@@ -17,10 +17,12 @@ struct memrange {
     uint32_t type;
 };
 
-extern struct memrange memtab[];
+extern struct bios_memrange memtab[];
 
 extern void interrupt_init();
 extern uint32_t load_kernel(char *name);
+
+struct kpb kpb;
 
 uint32_t main()
 {
@@ -29,11 +31,22 @@ uint32_t main()
     printf(" SakuraOS Bootloader ");
     printf("==============================");
 
+    memset(&kpb, 0, sizeof(kpb));
+
     printf("Memory map from BIOS:\n");
-    for (struct memrange *mr = memtab; mr->size != 0; mr++)
+    struct memrange *kpb_mr = kpb.memtab;
+    for (struct bios_memrange *mr = memtab; mr->size != 0; mr++) {
         printf("  %s 0x%x - 0x%x (%uk)\n",
                mr->type == 1 ? "free" : "resv", mr->base,
                mr->base + mr->size - 1, mr->size / 1024);
+        
+        if (mr->base >= 0x100000) {
+            kpb_mr->base = mr->base;
+            kpb_mr->size = mr->size;
+            kpb_mr->type = mr->type;
+            kpb_mr++;
+        }
+    }
     
     interrupt_init();
     floppy_init();

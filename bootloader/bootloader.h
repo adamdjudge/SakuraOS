@@ -15,6 +15,30 @@
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
+struct memrange {
+    uint32_t base;
+    uint32_t size;
+    uint32_t type;
+};
+
+struct module {
+    uint32_t start_addr;
+    struct {
+        uint32_t pbase;
+        uint32_t vbase;
+        uint32_t size;
+        uint32_t flags;
+    } segments[4];
+};
+
+/* Kernel Parameters Block */
+struct kpb {
+    struct memrange memtab[8];
+    struct module modules[16];
+};
+
+extern struct kpb kpb;
+
 uint8_t in_byte(uint16_t port);
 uint8_t in_byte_wait(uint16_t port);
 void out_byte(uint16_t port, uint8_t val);

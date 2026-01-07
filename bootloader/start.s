@@ -8,6 +8,7 @@ extern __bss_end
 extern __loram_top
 extern main
 extern memdetect
+extern kpb
 
 %define GDT_CS 0x08
 %define GDT_DS 0x10
@@ -69,6 +70,7 @@ enter_protected_mode:
     call main
     cmp eax, 0
     je .halt
+    push kpb
     jmp eax
 .halt:
     hlt

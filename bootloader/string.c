@@ -23,6 +23,13 @@ bool strcmp(char *a, char *b)
     return *a == *b;
 }
 
+void memset(void *s, char c, unsigned int n)
+{
+    char *sp = (char *)s;
+    while (n--)
+        *sp++ = c;
+}
+
 static void printd(char **p, unsigned int v)
 {
     if (v / 10)
