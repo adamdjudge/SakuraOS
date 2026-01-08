@@ -9,6 +9,10 @@
 #define PAGE_SIZE 4096
 #define PAGE_MASK 0xfff
 
+#define K 1024
+#define M K*K
+#define G M*K
+
 /**
  * Page attribute flags for Page Directory and Page Table entries.
  */
@@ -33,6 +37,6 @@
 #define DIRENT(v)  (v >> 22)
 #define TABENT(v)  (v >> 12)
 
-void mm_init();
+void mm_init(struct kpb *kpb);
 
 #endif

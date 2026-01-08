@@ -12,12 +12,12 @@ extern uint16_t cpuid_base_freq;
 
 extern void debug_init();
 
-void kmain()
+void kmain(struct kpb *kpb)
 {
     debug_init();
     debug("starting SakuraOS kernel...");
     debug("processor: %s %s @ %d MHz", cpuid_vendor, cpuid_brand,
           cpuid_base_freq);
     
-    mm_init();
+    mm_init(kpb);
 }
