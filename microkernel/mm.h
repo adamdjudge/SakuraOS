@@ -37,6 +37,6 @@
 #define DIRENT(v)  (v >> 22)
 #define TABENT(v)  (v >> 12)
 
-void mm_init(struct kpb *kpb);
+
 
 #endif

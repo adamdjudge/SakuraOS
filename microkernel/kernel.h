@@ -38,11 +38,27 @@ struct module {
 #define MAX_MEMRANGES 8
 #define MAX_MODULES 16
 
-/* Kernel Parameters Block */
+/* Kernel Parameters Block
+ * Contains information passed to the kernel from the bootloader.
+ */
 struct kpb {
     struct memrange memtab[MAX_MEMRANGES];
     struct module modules[MAX_MODULES];
 };
+
+/* Kernel Information Block
+ * Contains kernel-maintained information presented to priviledged tasks.
+ */
+struct kip {
+    uint32_t uptime_s;
+    uint32_t uptime_us;
+    uint32_t memtotal;
+    uint32_t kmem;
+    struct memrange memtab[MAX_MEMRANGES];
+    struct module modules[MAX_MODULES];
+};
+
+extern struct kip kip;
 
 uint8_t in_byte(uint16_t port);
 uint8_t in_byte_wait(uint16_t port);
