@@ -15,6 +15,10 @@
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
+#define MEMRANGE_TYPE_NONE 0
+#define MEMRANGE_TYPE_FREE 1
+#define MEMRANGE_TYPE_SPECIAL 2
+
 struct memrange {
     uint32_t base;
     uint32_t size;

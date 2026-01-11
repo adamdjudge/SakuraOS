@@ -9,7 +9,7 @@
 #define PAGE_SIZE 4096
 #define PAGE_MASK 0xfff
 
-#define K 1024
+#define K (uint32_t)1024
 #define M K*K
 #define G M*K
 
@@ -35,7 +35,7 @@
  * Get the Page Directory index or Page Table index of a virtual address.
  */
 #define DIRENT(v)  (v >> 22)
-#define TABENT(v)  (v >> 12)
+#define TABENT(v)  ((v >> 12) & 0x3ff)
 
 
 

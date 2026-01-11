@@ -30,13 +30,19 @@ static inline uint32_t pop_frame()
     return pagesp ? pagestack[--pagesp] : 0;
 }
 
-static uint32_t reserve_kernel_memory(struct kpb *kpb)
+static uint32_t modules_top;
+static uint32_t kmem_top;
+
+static void reserve_kernel_memory(struct kpb *kpb)
 {
+    kip.kmem = MIN(256*M, MAX(1*M, PAGE_ALIGN(kip.memtotal / 8)));
+    debug("kernel reserved memory: %d KB", kip.kmem / K);
+
     uint32_t ksize = PAGE_ALIGN((uint32_t)__kernel_end) - (uint32_t)__kernel_base;
 
     /* Find the end of where modules have been loaded by the bootloader. This
      * marks the start of free himem pages. */
-    uint32_t modules_top = PAGE_ALIGN((uint32_t)__kernel_end);
+    modules_top = PAGE_ALIGN((uint32_t)__kernel_end);
     for (struct module *mod = kpb->modules; mod < kpb->modules + MAX_MODULES; mod++) {
         if (mod->start_addr == 0)
             break;
@@ -55,13 +61,13 @@ static uint32_t reserve_kernel_memory(struct kpb *kpb)
 
     /* Push kernel reserved memory pages onto the page stack. Everything above
      * them will later be granted to userspace. */
-    uint32_t kmem_top = modules_top;
+    kmem_top = modules_top;
     for (uint32_t addr = PAGE_SIZE; addr < 640*K; addr += PAGE_SIZE)
         push_frame(addr);
     for (struct memrange *mr = kpb->memtab; mr < kpb->memtab + MAX_MEMRANGES; mr++) {
         if (mr->size == 0)
             break;
-        else if (mr->type != 1)
+        else if (mr->type != MEMRANGE_TYPE_FREE)
             continue;
         for (uint32_t addr = mr->base; addr < mr->base + mr->size; addr += PAGE_SIZE) {
             if (pagesp * PAGE_SIZE >= kip.kmem - ksize)
@@ -72,8 +78,31 @@ static uint32_t reserve_kernel_memory(struct kpb *kpb)
             }
         }
     }
+}
 
-    return kmem_top;
+static void fill_kip_memtab(struct kpb *kpb)
+{
+    /* Entry for video memory */
+    kip.memtab[0].base = 0xA0000;
+    kip.memtab[0].size = 128*K;
+    kip.memtab[0].type = MEMRANGE_TYPE_SPECIAL;
+
+    /* Entry for modules loaded by bootloader */
+    kip.memtab[1].base = PAGE_ALIGN((uint32_t)__kernel_end);
+    kip.memtab[1].size = modules_top - kip.memtab[1].base;
+    kip.memtab[1].type = MEMRANGE_TYPE_FREE;
+
+    int i = 2;
+    for (struct memrange *mr = kpb->memtab; mr < kpb->memtab + MAX_MEMRANGES; mr++) {
+        if (mr->size == 0)
+            break;
+        else if (mr->base + mr->size > kmem_top && mr->base < 3*G) {
+            kip.memtab[i].base = MAX(mr->base, kmem_top);
+            kip.memtab[i].size = MIN(mr->base + mr->size, 3*G) - kip.memtab[i].base;
+            kip.memtab[i].type = mr->type;
+            i++;
+        }
+    }
 }
 
 void mm_init(struct kpb *kpb)
@@ -87,17 +116,15 @@ void mm_init(struct kpb *kpb)
     for (struct memrange *mr = kpb->memtab; mr < kpb->memtab + MAX_MEMRANGES; mr++) {
         if (mr->size == 0)
             break;
-        else if (mr->type == 1)
+        else if (mr->type == MEMRANGE_TYPE_FREE)
             kip.memtotal += mr->size;
         debug("mem 0x%x - 0x%x %s", mr->base, mr->base + mr->size - 1,
               mr->type == 1 ? "free" : "resvd");
     }
     debug("total usable memory: %d KB", kip.memtotal / K);
 
-    kip.kmem = MIN(256*M, MAX(1*M, PAGE_ALIGN(kip.memtotal / 8)));
-    debug("kernel reserved memory: %d KB", kip.kmem / K);
-
     reserve_kernel_memory(kpb);
+    fill_kip_memtab(kpb);
 
     /* Map page tables into the page directory. */
     for (int i = 0; i < 96; i++) {
