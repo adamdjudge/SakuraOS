@@ -7,6 +7,7 @@ extern __kernel_bss
 extern __kernel_end
 extern setup_idt
 extern kmain
+extern idle
 
 %define KERNEL_CS 0x08
 %define KERNEL_DS 0x10
@@ -96,6 +97,8 @@ _start:
     call kmain
 
     ; After initialization, this thread becomes the idle thread.
+    mov esp, idle + 1024
+    sti
 .idle:
     hlt
     jmp .idle

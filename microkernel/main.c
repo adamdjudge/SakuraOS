@@ -14,6 +14,7 @@ struct kip __attribute__((aligned(PAGE_SIZE))) kip;
 
 extern void debug_init();
 extern void mm_init(struct kpb *kpb);
+extern void sched_init();
 
 void kmain(struct kpb *kpb)
 {
@@ -26,4 +27,5 @@ void kmain(struct kpb *kpb)
     for (int i = 0; i < MAX_MODULES; i++)
         kip.modules[i] = kpb->modules[i];
     mm_init(kpb);
+    sched_init();
 }

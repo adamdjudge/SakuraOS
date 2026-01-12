@@ -58,6 +58,7 @@ struct kip {
     uint32_t uptime_us;
     uint32_t memtotal;
     uint32_t kmem;
+    uint32_t kmemused;
     struct memrange memtab[MAX_MEMRANGES];
     struct module modules[MAX_MODULES];
 };

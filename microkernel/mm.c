@@ -22,11 +22,13 @@ unsigned int pagesp;
 
 static inline void push_frame(uint32_t paddr)
 {
+    kip.kmemused -= PAGE_SIZE;
     pagestack[pagesp++] = paddr;
 }
 
 static inline uint32_t pop_frame()
 {
+    kip.kmemused += PAGE_SIZE;
     return pagesp ? pagestack[--pagesp] : 0;
 }
 
@@ -78,6 +80,8 @@ static void reserve_kernel_memory(struct kpb *kpb)
             }
         }
     }
+
+    kip.kmemused = ksize;
 }
 
 static void fill_kip_memtab(struct kpb *kpb)
@@ -135,7 +139,7 @@ void mm_init(struct kpb *kpb)
     /* Identity-map the bottom 256M of physical memory, including the kernel,
      * but write-protect the kernel text segment. */
     for (uint32_t addr = PAGE_SIZE; addr < 256*M; addr += PAGE_SIZE) {
-        if (addr >= (uint32_t)__kernel_base && addr < (uint32_t)__kernel_end)
+        if (addr >= (uint32_t)__kernel_base && addr < (uint32_t)__kernel_rw)
             kpagetable[addr / PAGE_SIZE] = addr | PAGE_PRESENT;
         else
             kpagetable[addr / PAGE_SIZE] = addr | PAGE_PRESENT | PAGE_WRITABLE;

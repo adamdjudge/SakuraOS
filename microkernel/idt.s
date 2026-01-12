@@ -208,9 +208,7 @@ common_handler:
 
     ; Call C exception handling code.
 .skip_eoi:
-    sti
     call handle_exception
-    cli
 
 global iret_from_exception
 iret_from_exception:
