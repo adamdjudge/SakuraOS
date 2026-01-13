@@ -3,7 +3,13 @@
  * Copyright 2026 Adam Judge
  */
 
-struct task {
+enum {
+    TASK_NONE,
+    TASK_RUN,
+    TASK_BLOCK,
+};
+
+ struct task {
     uint32_t pid;
     uint32_t state;
     uint32_t esp;
