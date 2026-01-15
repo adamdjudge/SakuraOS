@@ -16,9 +16,8 @@
 
 #define TASKS ((struct task *)(256*M))
 
-struct task *current;
-static struct task *runlist_head, *runlist_tail;
-//static struct task *blocklist_head, *blocklist_tail;
+struct task *current, *runlist;
+//static struct task *blocklist;
 struct task __attribute__((aligned(sizeof(struct task)))) idle;
 
 //static unsigned int next_task;
@@ -40,26 +39,10 @@ void sched_init()
 
 void schedule()
 {
-    /* If it's still running, re-enqueue the current task. */
-    if (current != &idle && current->state == TASK_RUN) {
-        if (runlist_tail) {
-            runlist_tail->next = current;
-            current->prev = runlist_tail;
-        }
-        runlist_tail = current;
-        if (!runlist_head)
-            runlist_head = current;
-    }
-
-    /* Pop the next task to run from the running queue. */
     struct task *selected;
-    if (runlist_head) {
-        selected = runlist_head;
-        if (selected->next)
-            selected->next->prev = NULL;
-        selected->next = NULL;
-        selected->next = NULL;
-        runlist_head = selected->next;
+    if (runlist) {
+        selected = runlist;
+        runlist = runlist->next;
     } else {
         selected = &idle;
     }
