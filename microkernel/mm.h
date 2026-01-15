@@ -37,6 +37,9 @@
 #define DIRENT(v)  (v >> 22)
 #define TABENT(v)  ((v >> 12) & 0x3ff)
 
-
+bool mm_map_page(uint32_t vaddr, uint32_t paddr, uint32_t flags);
+bool mm_alloc_page(uint32_t vaddr, uint32_t flags);
+bool mm_is_page_writable(uint32_t vaddr);
+uint32_t mm_vaddr_to_paddr(uint32_t vaddr);
 
 #endif

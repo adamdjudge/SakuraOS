@@ -156,3 +156,57 @@ void mm_init(struct kpb *kpb)
     );
     debug("virtual address translation enabled");
 }
+
+bool mm_map_page(uint32_t vaddr, uint32_t paddr, uint32_t flags)
+{
+    uint32_t *pagedir;
+    __asm__ __volatile__("mov %%cr3, %0" : "=r"(pagedir));
+
+    uint32_t *pagetable;
+    if ((pagedir[DIRENT(vaddr)] & PAGE_PRESENT) == 0) {
+        pagetable = (uint32_t *)pop_frame();
+        if (!pagetable)
+            return false;
+        for (int i = 0; i < 1024; i++)
+            pagetable[i] = 0;
+        pagedir[DIRENT(vaddr)] = (uint32_t)pagetable | PAGE_PRESENT | PAGE_WRITABLE;
+    } else {
+        pagetable = (uint32_t *)PAGE_BASE(pagedir[DIRENT(vaddr)]);
+    }
+
+    pagetable[TABENT(vaddr)] = paddr | PAGE_PRESENT | flags;
+    return true;
+}
+
+bool mm_alloc_page(uint32_t vaddr, uint32_t flags)
+{
+    uint32_t paddr;
+    if ((paddr = pop_frame()) == 0)
+        return false;
+    else
+        return mm_map_page(vaddr, paddr, flags);
+}
+
+bool mm_is_page_writable(uint32_t vaddr)
+{
+    uint32_t *pagedir;
+    __asm__ __volatile__("mov %%cr3, %0" : "=r"(pagedir));
+
+    uint32_t *pagetable = (uint32_t *)PAGE_BASE(pagedir[DIRENT(vaddr)]);
+    if (!pagetable)
+        return false;
+    else
+        return (pagetable[TABENT(vaddr)] & PAGE_WRITABLE) != 0;
+}
+
+uint32_t mm_vaddr_to_paddr(uint32_t vaddr)
+{
+    uint32_t *pagedir;
+    __asm__ __volatile__("mov %%cr3, %0" : "=r"(pagedir));
+
+    uint32_t *pagetable = (uint32_t *)PAGE_BASE(pagedir[DIRENT(vaddr)]);
+    if (!pagetable)
+        return 0;
+    else
+        return PAGE_BASE(pagetable[TABENT(vaddr)]) + (vaddr & PAGE_MASK);
+}
