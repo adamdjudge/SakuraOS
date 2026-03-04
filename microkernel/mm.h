@@ -41,5 +41,6 @@ bool mm_map_page(uint32_t vaddr, uint32_t paddr, uint32_t flags);
 bool mm_alloc_page(uint32_t vaddr, uint32_t flags);
 bool mm_is_page_writable(uint32_t vaddr);
 uint32_t mm_vaddr_to_paddr(uint32_t vaddr);
+uint32_t mm_create_addr_space();
 
 #endif

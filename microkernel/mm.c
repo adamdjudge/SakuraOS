@@ -181,10 +181,13 @@ bool mm_map_page(uint32_t vaddr, uint32_t paddr, uint32_t flags)
 bool mm_alloc_page(uint32_t vaddr, uint32_t flags)
 {
     uint32_t paddr;
-    if ((paddr = pop_frame()) == 0)
+    if ((paddr = pop_frame()) == 0) {
         return false;
-    else
+    } else {
+        for (int i = 0; i < 1024; i++)
+            ((uint32_t *)paddr)[i] = 0;
         return mm_map_page(vaddr, paddr, flags);
+    }
 }
 
 bool mm_is_page_writable(uint32_t vaddr)
@@ -196,7 +199,7 @@ bool mm_is_page_writable(uint32_t vaddr)
     if (!pagetable)
         return false;
     else
-        return (pagetable[TABENT(vaddr)] & PAGE_WRITABLE) != 0;
+        return !!(pagetable[TABENT(vaddr)] & (PAGE_PRESENT | PAGE_WRITABLE));
 }
 
 uint32_t mm_vaddr_to_paddr(uint32_t vaddr)
@@ -209,4 +212,18 @@ uint32_t mm_vaddr_to_paddr(uint32_t vaddr)
         return 0;
     else
         return PAGE_BASE(pagetable[TABENT(vaddr)]) + (vaddr & PAGE_MASK);
+}
+
+uint32_t mm_create_addr_space()
+{
+    uint32_t *pagedir = (uint32_t *)pop_frame();
+    if (!pagedir)
+        return 0;
+
+    for (int i = 0; i < 96; i++) {
+        uint32_t addr = (uint32_t)kpagetable + i * PAGE_SIZE;
+        pagedir[i] = addr | PAGE_PRESENT | PAGE_WRITABLE;
+    }
+
+    return (uint32_t)pagedir;
 }

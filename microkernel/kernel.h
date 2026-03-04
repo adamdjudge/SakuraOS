@@ -65,6 +65,15 @@ struct kip {
 
 extern struct kip kip;
 
+/* Kernel error codes */
+enum {
+    SUCCESS,
+    ERR_INVALID,
+    ERR_BAD_PID,
+    ERR_OUT_OF_MEMORY,
+    ERR_NO_FREE_TCB,
+};
+
 uint8_t in_byte(uint16_t port);
 uint8_t in_byte_wait(uint16_t port);
 void out_byte(uint16_t port, uint8_t val);

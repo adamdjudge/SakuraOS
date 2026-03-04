@@ -3,6 +3,11 @@
  * Copyright 2026 Adam Judge
  */
 
+#ifndef SCHED_H
+#define SCHED_H
+
+#define NUM_TASKS (128*K)
+
 enum {
     TASK_NONE,
     TASK_RUN,
@@ -22,3 +27,8 @@ enum {
 };
 
 extern struct task *current;
+
+int sched_create_task(uint32_t addrspace_pid, uint32_t pfhandler,
+                      uint32_t exhandler);
+
+#endif
