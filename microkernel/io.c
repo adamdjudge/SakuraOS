@@ -3,7 +3,7 @@
  * Copyright 2026 Adam Judge
  */
 
-#include "kernel.h"
+#include <stdint.h>
 
 uint8_t in_byte(uint16_t port)
 {

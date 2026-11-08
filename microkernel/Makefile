@@ -1,9 +1,15 @@
 CC = x86_64-linux-gnu-gcc
-CFLAGS = -c -m32 -ffreestanding -fno-pie -std=c99 -Werror -Wall
 AS = nasm
 LD = x86_64-linux-gnu-ld
 
-OBJ = start.o idt.o main.o io.o debug.o exception.o mm.o sched.o
+CFLAGS = -c -m32 -ffreestanding -fno-pie -std=c99 -Werror -Wall
+ASFLAGS = -f elf32
+
+#OBJ = start.o idt.o main.o io.o debug.o exception.o mm.o sched.o
+OBJ = start.o \
+      main.o \
+	  io.o \
+	  debug.o
 
 kernel: link.x $(OBJ)
 	$(LD) -T $< -o kernel $(OBJ)
@@ -12,7 +18,10 @@ kernel: link.x $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $<
 
 %.o: %.s
-	$(AS) -f elf32 -o $@ $<
+	$(AS) $(ASFLAGS) -o $@ $<
+
+run: kernel
+	qemu-system-i386 -serial stdio -kernel kernel
 
 clean:
 	rm -f kernel *.o

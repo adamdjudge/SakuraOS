@@ -3,6 +3,7 @@
  * Copyright 2026 Adam Judge
  */
 
+#include <stdint.h>
 #include "kernel.h"
 
 /* UART base addresses */
