@@ -5,7 +5,7 @@
 
 extern __kernel_bss
 extern __kernel_end
-extern kmain
+extern start
 
 ; ==============================================================================
 ; Multiboot header
@@ -31,8 +31,8 @@ align 4
 section .text
 bits 32
 
-global _start
-_start:
+global _entry
+_entry:
     mov esp, init_stack + 1024
 
     ; Zero out the BSS.
@@ -76,8 +76,8 @@ _start:
     cpuid
     mov [cpuid_base_freq], ax
 
-    ; Call kernel main function in C.
-    call kmain
+    ; Start running C code.
+    call start
 
 .halt:
     hlt

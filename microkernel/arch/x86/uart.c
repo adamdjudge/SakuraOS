@@ -3,7 +3,7 @@
  * Copyright 2026 Adam Judge
  */
 
-#include "kernel.h"
+#include "io.h"
 
 /* UART base addresses */
 #define BASE_COM1   0x3f8

@@ -1,19 +1,17 @@
-CC = x86_64-linux-gnu-gcc
-AS = nasm
-LD = x86_64-linux-gnu-ld
+ARCH_PATH = arch/x86/
+include $(ARCH_PATH)/arch.mk
 
-CFLAGS = -c -m32 -ffreestanding -fno-pie -std=c99 -Werror -Wall
-ASFLAGS = -f elf32
+OBJS = $(addprefix $(ARCH_PATH), $(ARCH_OBJS))
+OBJS += debug.o
 
-#OBJ = start.o idt.o main.o io.o debug.o exception.o mm.o sched.o
-OBJ = start.o \
-      main.o \
-	  io.o \
-	  debug.o \
-	  uart.o
+LINKER_SCRIPT = $(ARCH_PATH)$(ARCH_LINKER_SCRIPT)
 
-kernel: link.x $(OBJ)
-	$(LD) -T $< -o kernel $(OBJ)
+TARGET = kernel.elf
+
+all: $(TARGET)
+
+$(TARGET): $(LINKER_SCRIPT) $(OBJS)
+	$(LD) -T $(LINKER_SCRIPT) -o $(TARGET) $(OBJS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ $<
@@ -21,8 +19,8 @@ kernel: link.x $(OBJ)
 %.o: %.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
-run: kernel
-	qemu-system-i386 -serial stdio -kernel kernel
+run: $(TARGET)
+	qemu-system-i386 -serial stdio -kernel $(TARGET)
 
 clean:
-	rm -f kernel *.o
+	rm -f $(TARGET) $(OBJS)
