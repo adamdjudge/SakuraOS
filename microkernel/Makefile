@@ -9,7 +9,8 @@ ASFLAGS = -f elf32
 OBJ = start.o \
       main.o \
 	  io.o \
-	  debug.o
+	  debug.o \
+	  uart.o
 
 kernel: link.x $(OBJ)
 	$(LD) -T $< -o kernel $(OBJ)

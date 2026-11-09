@@ -14,11 +14,11 @@ uint8_t in_byte(uint16_t port)
 
 uint8_t in_byte_wait(uint16_t port)
 {
-    uint8_t val = in_byte(port);
     int count = 10000;
     while (count)
         count--;
-    return val;
+
+    return in_byte(port);
 }
 
 void out_byte(uint16_t port, uint8_t val)
@@ -28,8 +28,9 @@ void out_byte(uint16_t port, uint8_t val)
 
 void out_byte_wait(uint16_t port, uint8_t val)
 {
-    out_byte(port, val);
     int count = 10000;
     while (count)
         count--;
+
+    out_byte(port, val);
 }

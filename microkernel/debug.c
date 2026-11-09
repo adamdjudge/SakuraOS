@@ -3,36 +3,10 @@
  * Copyright 2026 Adam Judge
  */
 
-#include <stdint.h>
+#include <stdarg.h>
 #include "kernel.h"
 
-/* UART base addresses */
-#define BASE_COM1        0x3f8
-#define BASE_COM2        0x2f8
-
-/* UART register offsets */
-#define UART_FIFO        0
-#define UART_IEN         1
-#define UART_DIVISOR_LO  0
-#define UART_DIVISOR_HI  1
-#define UART_INTID       2
-#define UART_FIFOCTL     2
-#define UART_LCR         3
-#define UART_MCR         4
-#define UART_LSR         5
-#define UART_MSR         6
-#define UART_SCRATCH     7
-
-void debug_init()
-{
-    out_byte_wait(BASE_COM1 + UART_IEN, 0x00);        /* Disable interrupts */
-    out_byte_wait(BASE_COM1 + UART_LCR, 0x80);        /* Set DLAB */
-    out_byte_wait(BASE_COM1 + UART_DIVISOR_LO, 0x0C); /* Set divisor to 12 */
-    out_byte_wait(BASE_COM1 + UART_DIVISOR_HI, 0x00); /*   for 9600 baud */
-    out_byte_wait(BASE_COM1 + UART_LCR, 0x03);        /* 8b data, no parity, 1b stop */
-    out_byte_wait(BASE_COM1 + UART_FIFOCTL, 0x07);    /* Enable and clear FIFO */
-    out_byte_wait(BASE_COM1 + UART_IEN, 0x01);        /* Enable receive interrupts */
-}
+extern void uart_puts(char *s);
 
 static void printd(char **p, unsigned int v)
 {
@@ -41,73 +15,81 @@ static void printd(char **p, unsigned int v)
     *(*p)++ = '0' + v % 10;
 }
 
-static void __vsprintf(char *buf, const char *fmt, void *argp)
+void vsprintf(char *buf, const char *fmt, va_list ap)
 {
-    int *ap = argp;
     char *s;
-    
+    int val;
+
     for (int i = 0; fmt[i]; i++) {
         if (fmt[i] != '%') {
             *buf++ = fmt[i];
             continue;
         }
+
         switch (fmt[++i]) {
         case '%':
             *buf++ = '%';
             break;
+
         case 'c':
-            *buf++ = (char) *ap++;
+            *buf++ = (char) va_arg(ap, int);
             break;
+
         case 's':
-            s = (char*) *ap++;
+            s = va_arg(ap, char *);
             while (*s)
                 *buf++ = *s++;
             break;
-        case 'x': // NOTE: This always prints 32-bit 8-digit hex
+
+        case 'x': // This always prints 32-bit 8-digit hex
             s = "0123456789ABCDEF";
+            val = va_arg(ap, int);
             for (int j = 28; j >= 0; j -= 4)
-                *buf++ = s[(*ap >> j) & 0xf];
-            ap++;
+                *buf++ = s[(val >> j) & 0xf];
             break;
+
         case 'd':
-            if (*ap < 0)
+            val = va_arg(ap, int);
+            if (val < 0)
                 *buf++ = '-';
-            printd(&buf, ABS(*ap));
+            printd(&buf, ABS(val));
             ap++;
             break;
+
         case 'u':
-            printd(&buf, (unsigned int) *ap++);
+            printd(&buf, va_arg(ap, unsigned int));
             break;
+
         default:
             *buf++ = '%';
             *buf++ = fmt[i];
         }
     }
+
     *buf = '\0';
 }
 
-void vsprintf(char *buf, const char *fmt, ...)
+void sprintf(char *buf, const char *fmt, ...)
 {
-    __vsprintf(buf, fmt, &fmt + 1);
-}
+    va_list ap;
 
-static void write_serial(const char *buf)
-{
-    while (*buf) {
-        while ((in_byte(BASE_COM1 + UART_LSR) & 0x20) == 0);
-        if (*buf == '\n')
-            out_byte(BASE_COM1 + UART_FIFO, '\r');
-        out_byte(BASE_COM1 + UART_FIFO, *buf++);
-    }
+    va_start(ap, fmt);
+    vsprintf(buf, fmt, ap);
+    va_end(ap);
 }
 
 void __debug(const char *file, int line, const char *fmt, ...)
 {
     char buf[128];
+    va_list ap;
 
-    vsprintf(buf, "%s:%d: ", file, line);
-    write_serial(buf);
-    __vsprintf(buf, fmt, &fmt + 1);
-    write_serial(buf);
-    write_serial("\n");
+    sprintf(buf, "%s:%d: ", file, line);
+    uart_puts(buf);
+
+    va_start(ap, fmt);
+    vsprintf(buf, fmt, ap);
+    va_end(ap);
+
+    uart_puts(buf);
+    uart_puts("\n");
 }

@@ -6,6 +6,8 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
+#include <stdint.h>
+
 #define NULL (void*) 0
 
 #define ABS(x) (x < 0 ? -x : x)
